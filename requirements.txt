@@ -1,0 +1,12 @@
+fastapi==0.115.14
+mangum
+uvicorn==0.35.0
+pydantic==2.11.7
+pydantic_core==2.33.2
+python-dotenv==1.1.0
+SQLAlchemy==2.0.41
+python-multipart==0.0.20
+email_validator==2.2.0
+passlib==1.7.4
+bcrypt==4.3.0
+requests==2.32.3
