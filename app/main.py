@@ -4,8 +4,10 @@ from app.api.routes import admin_auth, category_routes, user_routes, service_pro
 from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from mangum import Mangum
 
 app = FastAPI()
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 Base.metadata.create_all(bind=engine)
@@ -35,7 +37,7 @@ app.include_router(sub_category_routes.router, prefix="/api")
 app.include_router(service_routes.router, prefix="/api")
 
 app.include_router(service_provider_routes.router, prefix="/api")  # service provider routes
-
+handler = Mangum(app) 
 # ✅ Swagger Bearer Token config
 def custom_openapi():
     if app.openapi_schema:
