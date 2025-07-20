@@ -15,8 +15,9 @@ class ServiceProviderBase(BaseModel):
     account_number: str
     ifsc_code: str
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class ServiceProviderCreate(ServiceProviderBase):
     pass
