@@ -75,7 +75,7 @@ from app.api.routes import (
     user_routes,
     service_provider_routes,
     sub_category_routes,
-    service_routes
+    service_routes,
 )
 from app.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware

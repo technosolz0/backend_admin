@@ -61,8 +61,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.models.user import User, UserStatus
 from app.schemas import user_schema
-from app.utils.otp_utils import generate_otp
-from app.utils.email_utils import send_email_otp
+from app.utils.otp_utils import generate_otp, send_email_otp
 from datetime import datetime, timedelta
 from app.core.security import get_password_hash
 
