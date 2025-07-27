@@ -1,5 +1,5 @@
-# app/models/category.py
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Category(Base):
@@ -9,3 +9,7 @@ class Category(Base):
     name = Column(String, nullable=False)
     image = Column(String, nullable=False)
     status = Column(String, default='Active')
+
+    sub_categories = relationship("SubCategory", back_populates="category", cascade="all, delete")
+    providers = relationship("ServiceProvider", back_populates="category")
+    services = relationship("Service", back_populates="category")

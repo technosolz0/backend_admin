@@ -10,5 +10,8 @@ class SubCategory(Base):
     image = Column(String, nullable=True)
     status = Column(String, default='Active')
 
-    category_id = Column(Integer, ForeignKey('categories.id'))
-    category = relationship("Category")
+    category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)
+
+    category = relationship("Category", back_populates="sub_categories")
+    services = relationship("Service", back_populates="sub_category")  # ✅ Add this
+    providers = relationship("ServiceProvider", back_populates="sub_category")
