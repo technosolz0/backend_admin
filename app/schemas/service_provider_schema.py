@@ -1,88 +1,99 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
+from typing import Optional
+from enum import Enum
 from datetime import datetime
+
+from servex_admin.backend_admin.app.models.service_provider_model import VendorStatus, WorkStatus
+class SubCategoryCharge(BaseModel):
+    subcategory_id: int
+    service_charge: float
 
 class ServiceProviderBase(BaseModel):
     full_name: str
     email: EmailStr
     phone: str
-    category_id: int
-    sub_category_id: Optional[int] = None
-    service_ids: List[int] = Field(default_factory=list)
-    service_locations: List[str] = Field(default_factory=list)
-    address: Optional[str] = None
-    road: Optional[str] = None
-    landmark: Optional[str] = None
-    pin_code: Optional[str] = None
-    experience_years: Optional[int] = None
-    about: Optional[str] = None
-    bank_name: Optional[str] = None
-    account_name: Optional[str] = None
-    account_number: Optional[str] = None
-    ifsc_code: Optional[str] = None
-    profile_pic_path: Optional[str] = None
-    address_proof_path: Optional[str] = None
-    bank_statement_path: Optional[str] = None
-    work_status: Optional[str] = "offline"
-
-    @validator("experience_years")
-    def validate_experience_years(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Experience years cannot be negative")
-        return v
-
-    @validator("pin_code")
-    def validate_pin_code(cls, v):
-        if v is not None and not v.isdigit():
-            raise ValueError("Pin code must contain only digits")
-        return v
-
-    class Config:
-        from_attributes = True
 
 class ServiceProviderCreate(ServiceProviderBase):
     password: str
+    category_id: Optional[int] = None
+    subcategory_charges: Optional[List[SubCategoryCharge]] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    upi_id: Optional[str] = None
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    terms_accepted: bool = False
+    fcm_token: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_name: Optional[str] = None
 
 class ServiceProviderUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
-    category_id: Optional[int] = None
-    sub_category_id: Optional[int] = None
-    service_ids: Optional[List[int]] = None
-    service_locations: Optional[List[str]] = None
     address: Optional[str] = None
-    road: Optional[str] = None
-    landmark: Optional[str] = None
-    pin_code: Optional[str] = None
-    experience_years: Optional[int] = None
-    about: Optional[str] = None
-    bank_name: Optional[str] = None
-    account_name: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    category_id: Optional[int] = None
+    subcategory_charges: Optional[List[SubCategoryCharge]] = None
+    account_holder_name: Optional[str] = None
     account_number: Optional[str] = None
     ifsc_code: Optional[str] = None
-    profile_pic_path: Optional[str] = None
-    address_proof_path: Optional[str] = None
-    bank_statement_path: Optional[str] = None
-    work_status: Optional[str] = None
+    upi_id: Optional[str] = None
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    terms_accepted: Optional[bool] = None
+    fcm_token: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_name: Optional[str] = None
 
-    @validator("experience_years")
-    def validate_experience_years(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Experience years cannot be negative")
-        return v
+class ServiceProviderDeviceUpdate(BaseModel):
+    fcm_token: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_name: Optional[str] = None
 
-    @validator("pin_code")
-    def validate_pin_code(cls, v):
-        if v is not None and not v.isdigit():
-            raise ValueError("Pin code must contain only digits")
-        return v
-
-class ServiceProviderOut(ServiceProviderBase):
+class ServiceProviderOut(BaseModel):
     id: int
-    status: str
-    is_verified: bool
+    full_name: str
+    email: EmailStr
+    phone: str
+    profile_pic: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    status: VendorStatus
+    work_status: WorkStatus
+    category_id: Optional[int] = None
+    subcategory_charges: Optional[List[SubCategoryCharge]] = None
+    terms_accepted: bool
+    fcm_token: Optional[str] = None
     last_login: Optional[datetime] = None
-    created_at: datetime
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_name: Optional[str] = None
+    last_device_update: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+
+class ServiceProviderLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class ServiceProviderLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    vendor: ServiceProviderOut
 
 class VendorOTPRequest(BaseModel):
     email: EmailStr
@@ -93,4 +104,4 @@ class VendorOTPVerify(BaseModel):
 
 class VendorResetPassword(BaseModel):
     email: EmailStr
-    new_password: str
+    password: str
