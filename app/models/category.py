@@ -4,6 +4,7 @@ from app.database import Base
 
 class Category(Base):
     __tablename__ = 'categories'
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
@@ -12,4 +13,3 @@ class Category(Base):
 
     sub_categories = relationship("SubCategory", back_populates="category", cascade="all, delete")
     providers = relationship("ServiceProvider", back_populates="category")
-    services = relationship("Service", back_populates="category")

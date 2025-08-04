@@ -1,125 +1,130 @@
-from datetime import datetime
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from app.models.service_provider_model import ServiceProvider, VendorStatus, vendor_subcategory_charges
+from app.models.category import Category
+from app.models.sub_category import SubCategory
 from app.schemas.service_provider_schema import (
-    ServiceProviderCreate, ServiceProviderDeviceUpdate, ServiceProviderOut, ServiceProviderUpdate, SubCategoryCharge,
-    VendorOTPRequest, VendorOTPVerify, VendorResetPassword, ServiceProviderLoginResponse
+    SubCategoryCharge, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
+    AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate
 )
-from passlib.context import CryptContext
-from app.utils.otp_utils import generate_otp, send_email_otp
-from app.core.security import create_access_token, get_db, get_current_vendor, get_current_admin
-import enum
-import os
-from app.core.security import create_access_token, get_db, get_current_vendor
-from app.crud import service_provider_crud as crud
-from app.core.security import get_db, create_access_token, get_current_vendor
-from app.models.service_provider_model import VendorStatus, vendor_subcategory_charges, WorkStatus
+from app.core.security import create_access_token, get_current_vendor
+from app.crud.service_provider_crud import (
+    create_vendor, verify_vendor_otp, resend_otp,
+    update_vendor_address, update_vendor_bank, update_vendor_work, update_vendor_documents
+)
+from app.database import SessionLocal
+import json
 
+router = APIRouter(prefix="/vendor", tags=["vendor"])
 
-# Router
-router = APIRouter(prefix="/vendor", tags=["Vendors"])
+# OTP config
+OTP_EXPIRY_MINUTES = 10
+OTP_RESEND_COOLDOWN_SECONDS = 60
 
-@router.post("/register", response_model=ServiceProviderOut)
-def register_vendor(data: ServiceProviderCreate, db: Session = Depends(get_db)):
-    if not data.terms_accepted:
-        raise HTTPException(status_code=400, detail="Terms and conditions must be accepted")
-    return crud.create_vendor(db, data)
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@router.get("/categories")
+def get_categories(db: Session = Depends(get_db)):
+    return db.query(Category).filter(Category.status == 'Active').all()
+
+@router.get("/subcategories")
+def get_subcategories(category_id: int = None, db: Session = Depends(get_db)):
+    query = db.query(SubCategory).filter(SubCategory.status == 'Active')
+    if category_id:
+        query = query.filter(SubCategory.category_id == category_id)
+    return query.all()
+
+@router.post("/register", response_model=dict)
+def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
+    db_vendor = create_vendor(db, vendor)
+    return {"message": "OTP sent", "vendor_id": db_vendor.id}
+
+@router.post("/verify-otp", response_model=dict)
+def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
+    vendor, message = verify_vendor_otp(db, data.email, data.otp)
+    if not vendor:
+        raise HTTPException(status_code=400, detail=message)
+    return {"message": message, "vendor_id": vendor.id}
 
 @router.post("/send-otp")
-def send_otp(data: VendorOTPRequest, db: Session = Depends(get_db)):
-    crud.resend_otp(db, data.email)
-    return {"message": "OTP sent successfully"}
+def resend_otp(data: OTPRequest, db: Session = Depends(get_db)):
+    resend_otp(db, data.email)
+    return {"message": "OTP resent"}
 
-@router.post("/verify-otp", response_model=ServiceProviderLoginResponse)
-def verify_otp(data: VendorOTPVerify, db: Session = Depends(get_db)):
-    vendor, msg = crud.verify_vendor_otp(db, data.email, data.otp)
-    if not vendor:
-        raise HTTPException(status_code=400, detail=msg)
-    # Populate subcategory charges for response
-    charges = db.execute(
-        vendor_subcategory_charges.select().where(vendor_subcategory_charges.c.vendor_id == vendor.id)
-    ).fetchall()
-    vendor.subcategory_charges = [
-        SubCategoryCharge(subcategory_id=charge.subcategory_id, service_charge=charge.service_charge)
-        for charge in charges
-    ]
-    token = create_access_token({"sub": vendor.email, "vendor_id": vendor.id})
-    return ServiceProviderLoginResponse(access_token=token, vendor=vendor)
+@router.get("/me", response_model=VendorResponse)
+def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor)):
+    return current_vendor
 
-@router.post("/login", response_model=ServiceProviderLoginResponse)
-def login_vendor(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    vendor = crud.get_vendor_by_email(db, data.username)
-    if not vendor or not crud.verify_password(data.password, vendor.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    if not vendor.otp_verified:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="OTP verification required")
-    if not vendor.terms_accepted:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Terms and conditions not accepted")
-    vendor.last_login = datetime.utcnow()
-    db.commit()
-    # Populate subcategory charges for response
-    charges = db.execute(
-        vendor_subcategory_charges.select().where(vendor_subcategory_charges.c.vendor_id == vendor.id)
-    ).fetchall()
-    vendor.subcategory_charges = [
-        SubCategoryCharge(subcategory_id=charge.subcategory_id, service_charge=charge.service_charge)
-        for charge in charges
-    ]
-    token = create_access_token({"sub": vendor.email, "vendor_id": vendor.id})
-    return ServiceProviderLoginResponse(access_token=token, vendor=vendor)
-
-@router.put("/profile/complete", response_model=ServiceProviderOut)
-def complete_profile(
-    data: ServiceProviderUpdate,
-    db: Session = Depends(get_db),
-    current_vendor=Depends(get_current_vendor)
+@router.put("/profile/address", response_model=dict)
+async def update_address_details(
+    vendor_id: int = Form(...),
+    address: str = Form(...),
+    state: str = Form(...),
+    city: str = Form(...),
+    pincode: str = Form(...),
+    document_type: str = Form(...),
+    document_number: str = Form(...),
+    db: Session = Depends(get_db)
 ):
-    return crud.complete_vendor_profile(db, current_vendor.id, data)
+    update = AddressDetailsUpdate(
+        address=address,
+        state=state,
+        city=city,
+        pincode=pincode,
+        document_type=document_type,
+        document_number=document_number
+    )
+    vendor = update_vendor_address(db, vendor_id, update)
+    return {"message": "Address details updated", "vendor_id": vendor.id}
 
-@router.put("/device/update", response_model=ServiceProviderOut)
-def update_device_details(
-    data: ServiceProviderDeviceUpdate,
-    db: Session = Depends(get_db),
-    current_vendor=Depends(get_current_vendor)
+@router.put("/profile/bank", response_model=dict)
+async def update_bank_details(
+    vendor_id: int = Form(...),
+    account_holder_name: str = Form(...),
+    account_number: str = Form(...),
+    ifsc_code: str = Form(...),
+    upi_id: str = Form(...),
+    db: Session = Depends(get_db)
 ):
-    return crud.update_vendor_device(db, current_vendor.id, data)
+    update = BankDetailsUpdate(
+        account_holder_name=account_holder_name,
+        account_number=account_number,
+        ifsc_code=ifsc_code,
+        upi_id=upi_id
+    )
+    vendor = update_vendor_bank(db, vendor_id, update)
+    return {"message": "Bank details updated", "vendor_id": vendor.id}
 
-@router.post("/profile/upload-pic", response_model=ServiceProviderOut)
-async def upload_profile_picture(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_vendor=Depends(get_current_vendor)
+@router.put("/profile/work", response_model=dict)
+async def update_work_details(
+    vendor_id: int = Form(...),
+    category_id: int = Form(...),
+    subcategory_charges: str = Form(...),  # JSON string
+    db: Session = Depends(get_db)
 ):
-    return crud.upload_profile_pic(db, current_vendor.id, file)
+    try:
+        charges = json.loads(subcategory_charges)
+        update = WorkDetailsUpdate(
+            category_id=category_id,
+            subcategory_charges=[SubCategoryCharge(**charge) for charge in charges]
+        )
+        vendor = update_vendor_work(db, vendor_id, update)
+        return {"message": "Work details updated", "vendor_id": vendor.id}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid subcategory charges format")
 
-@router.put("/status/{vendor_id}/{status}", response_model=ServiceProviderOut)
-def update_status(
-    vendor_id: int,
-    status: VendorStatus,
-    db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
+@router.post("/profile/documents", response_model=dict)
+async def upload_documents(
+    vendor_id: int = Form(...),
+    profile_pic: UploadFile = File(...),
+    document_file: UploadFile = File(...),
+    db: Session = Depends(get_db)
 ):
-    return crud.change_vendor_status(db, vendor_id, status, admin)
-
-@router.get("/me", response_model=ServiceProviderOut)
-def get_me(vendor=Depends(get_current_vendor), db: Session = Depends(get_db)):
-    charges = db.execute(
-        vendor_subcategory_charges.select().where(vendor_subcategory_charges.c.vendor_id == vendor.id)
-    ).fetchall()
-    vendor.subcategory_charges = [
-        SubCategoryCharge(subcategory_id=charge.subcategory_id, service_charge=charge.service_charge)
-        for charge in charges
-    ]
-    return vendor
-
-@router.post("/reset-password")
-def reset_password(data: VendorResetPassword, db: Session = Depends(get_db)):
-    vendor = crud.get_vendor_by_email(db, data.email)
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
-    vendor.password = crud.get_password_hash(data.password)
-    db.commit()
-    return {"message": "Password reset successfully"}
+    vendor = update_vendor_documents(db, vendor_id, profile_pic, document_file)
+    return {"message": "Documents uploaded", "vendor_id": vendor.id}

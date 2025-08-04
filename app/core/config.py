@@ -1,0 +1,5 @@
+class OTPConfig:
+    EXPIRY_MINUTES = 5
+    MAX_ATTEMPTS = 3
+    MAX_RESENDS = 3
+    RESEND_COOLDOWN_MINUTES = 1

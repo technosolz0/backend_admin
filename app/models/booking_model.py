@@ -22,7 +22,7 @@ class Booking(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"))
     subcategory_id = Column(Integer, ForeignKey("sub_categories.id"))
-    service_id = Column(Integer, ForeignKey("services.id"))
+    # service_id = Column(Integer, ForeignKey("services.id"))
 
     scheduled_time = Column(DateTime, nullable=True)
     status = Column(Enum(BookingStatus), default=BookingStatus.pending)

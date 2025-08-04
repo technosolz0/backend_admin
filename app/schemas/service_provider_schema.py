@@ -1,107 +1,73 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
-from typing import Optional
-from enum import Enum
-from datetime import datetime
+from pydantic import BaseModel
+from typing import List, Optional
+from app.models.service_provider_model import VendorStatus
 
-from servex_admin.backend_admin.app.models.service_provider_model import VendorStatus, WorkStatus
 class SubCategoryCharge(BaseModel):
     subcategory_id: int
     service_charge: float
 
-class ServiceProviderBase(BaseModel):
+class VendorCreate(BaseModel):
     full_name: str
-    email: EmailStr
+    email: str
     phone: str
-
-class ServiceProviderCreate(ServiceProviderBase):
     password: str
-    category_id: Optional[int] = None
-    subcategory_charges: Optional[List[SubCategoryCharge]] = None
-    address: Optional[str] = None
-    state: Optional[str] = None
-    city: Optional[str] = None
-    pincode: Optional[str] = None
-    account_holder_name: Optional[str] = None
-    account_number: Optional[str] = None
-    ifsc_code: Optional[str] = None
-    upi_id: Optional[str] = None
-    document_type: Optional[str] = None
-    document_number: Optional[str] = None
-    terms_accepted: bool = False
-    fcm_token: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    device_name: Optional[str] = None
-
-class ServiceProviderUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    state: Optional[str] = None
-    city: Optional[str] = None
-    pincode: Optional[str] = None
-    category_id: Optional[int] = None
-    subcategory_charges: Optional[List[SubCategoryCharge]] = None
-    account_holder_name: Optional[str] = None
-    account_number: Optional[str] = None
-    ifsc_code: Optional[str] = None
-    upi_id: Optional[str] = None
-    document_type: Optional[str] = None
-    document_number: Optional[str] = None
-    terms_accepted: Optional[bool] = None
-    fcm_token: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    device_name: Optional[str] = None
-
-class ServiceProviderDeviceUpdate(BaseModel):
-    fcm_token: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    device_name: Optional[str] = None
-
-class ServiceProviderOut(BaseModel):
-    id: int
-    full_name: str
-    email: EmailStr
-    phone: str
-    profile_pic: Optional[str] = None
-    address: Optional[str] = None
-    state: Optional[str] = None
-    city: Optional[str] = None
-    pincode: Optional[str] = None
-    status: VendorStatus
-    work_status: WorkStatus
-    category_id: Optional[int] = None
-    subcategory_charges: Optional[List[SubCategoryCharge]] = None
     terms_accepted: bool
     fcm_token: Optional[str] = None
-    last_login: Optional[datetime] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
-    last_device_update: Optional[datetime] = None
+
+class AddressDetailsUpdate(BaseModel):
+    address: str
+    state: str
+    city: str
+    pincode: str
+    document_type: str
+    document_number: str
+
+class BankDetailsUpdate(BaseModel):
+    account_holder_name: str
+    account_number: str
+    ifsc_code: str
+    upi_id: str
+
+class WorkDetailsUpdate(BaseModel):
+    category_id: int
+    subcategory_charges: List[SubCategoryCharge]
+
+class VendorDeviceUpdate(BaseModel):
+    fcm_token: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_name: Optional[str] = None
+
+class VendorResponse(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: str
+    address: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    upi_id: Optional[str] = None
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    category_id: Optional[int] = None
+    profile_pic_url: Optional[str] = None
+    document_url: Optional[str] = None
+    status: VendorStatus
+    subcategory_charges: List[SubCategoryCharge]
 
     class Config:
         orm_mode = True
 
-class ServiceProviderLogin(BaseModel):
-    email: EmailStr
-    password: str
+class OTPRequest(BaseModel):
+    email: str
 
-class ServiceProviderLoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    vendor: ServiceProviderOut
-
-class VendorOTPRequest(BaseModel):
-    email: EmailStr
-
-class VendorOTPVerify(BaseModel):
-    email: EmailStr
+class OTPVerify(BaseModel):
+    email: str
     otp: str
-
-class VendorResetPassword(BaseModel):
-    email: EmailStr
-    password: str

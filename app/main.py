@@ -120,7 +120,7 @@ app.include_router(admin_auth.router, prefix="/api")
 app.include_router(user_routes.router, prefix="/api")
 app.include_router(category_routes.router, prefix="/api")
 app.include_router(sub_category_routes.router, prefix="/api")
-app.include_router(service_routes.router, prefix="/api")
+# app.include_router(service_routes.router, prefix="/api")
 app.include_router(service_provider_routes.router, prefix="/api")
 
 app.include_router(booking_routes.router, prefix="/api")
