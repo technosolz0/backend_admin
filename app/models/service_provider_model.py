@@ -1,88 +1,69 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, DateTime, Table, Float, Boolean
+# app/models/service_provider_model.py
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
-import enum
-from datetime import datetime
+import datetime
 
-# Association table for many-to-many: ServiceProvider <-> SubCategory
-vendor_subcategory_charges = Table(
-    'vendor_subcategory_charges',
-    Base.metadata,
-    Column('vendor_id', Integer, ForeignKey('service_providers.id'), primary_key=True),
-    Column('subcategory_id', Integer, ForeignKey('sub_categories.id'), primary_key=True),
-    Column('service_charge', Float, nullable=False),
-    extend_existing=True
-)
-
-# Enums
-class VendorStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-
-class WorkStatus(str, enum.Enum):
-    AVAILABLE = "AVAILABLE"
-    BUSY = "BUSY"
-    OFFLINE = "OFFLINE"
-
-# Main Model
 class ServiceProvider(Base):
     __tablename__ = "service_providers"
-    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    phone = Column(String, unique=True, index=True, nullable=False)
+    phone = Column(String, nullable=False)
     password = Column(String, nullable=False)
-
-    
-    profile_pic = Column(String, nullable=True)
-    address = Column(String, nullable=True)
-    state = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    pincode = Column(String, nullable=True)
+    profile_pic = Column(String)
+    address = Column(String)
+    state = Column(String)
+    city = Column(String)
+    pincode = Column(String)
     terms_accepted = Column(Boolean, default=False)
+    category_id = Column(Integer, ForeignKey("categories.id"))
+    account_holder_name = Column(String)
+    account_number = Column(String)
+    ifsc_code = Column(String)
+    upi_id = Column(String)
+    identity_doc_type = Column(String)
+    identity_doc_number = Column(String)
+    identity_doc_url = Column(String)
+    bank_doc_type = Column(String)
+    bank_doc_number = Column(String)
+    bank_doc_url = Column(String)
+    address_doc_type = Column(String)
+    address_doc_number = Column(String)
+    address_doc_url = Column(String)
+    fcm_token = Column(String)
+    last_login = Column(DateTime)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    device_name = Column(String)
+    last_device_update = Column(DateTime)
 
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    status = Column(SAEnum('pending', 'approved', 'rejected', name='vendor_status'), default='approved')
+    admin_status = Column(SAEnum('active', 'inactive', name='admin_status'), default='active')
+    work_status = Column(SAEnum('work_on', 'work_off', name='work_status'), default='work_on')
 
-    # Bank Details
-    account_holder_name = Column(String, nullable=True)
-    account_number = Column(String, nullable=True)
-    ifsc_code = Column(String, nullable=True)
-    upi_id = Column(String, nullable=True)
-
-    # KYC
-    document_type = Column(String, nullable=True)
-    document_number = Column(String, nullable=True)
-    document_image = Column(String, nullable=True)
-
-    # Device Info
-    fcm_token = Column(String, nullable=True)
-    last_login = Column(DateTime, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
-    device_name = Column(String, nullable=True)
-    last_device_update = Column(DateTime, nullable=True)
-
-    # Status / OTP
-    status = Column(Enum(VendorStatus), default=VendorStatus.PENDING)
-    work_status = Column(Enum(WorkStatus), default=WorkStatus.OFFLINE)
-    otp = Column(String, nullable=True)
-    otp_created_at = Column(DateTime, nullable=True)
+    otp = Column(String)
+    otp_created_at = Column(DateTime)
     otp_verified = Column(Boolean, default=False)
     otp_attempts = Column(Integer, default=0)
-    otp_last_sent = Column(DateTime, nullable=True)
-    otp_last_sent_at = Column(DateTime, nullable=True)
-
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    otp_last_sent_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     # Relationships
+    category = relationship("Category", back_populates="vendors")
+
+    # Link to VendorSubcategoryCharge table
+    subcategory_charges = relationship(
+        "VendorSubcategoryCharge",
+        back_populates="vendor",
+        cascade="all, delete-orphan"
+    )
+
+    # Shortcut to get subcategories directly
     subcategories = relationship(
         "SubCategory",
-        secondary=vendor_subcategory_charges,
-        back_populates="providers"
+        secondary="vendor_subcategory_charges",
+        viewonly=True
     )
-    category = relationship("Category", back_populates="providers")

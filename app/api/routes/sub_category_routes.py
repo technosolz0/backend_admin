@@ -47,6 +47,14 @@ def get_sub_category(sub_category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Sub-category not found")
     return sub_category
 
+@router.get("/by-category/{category_id}", response_model=list[SubCategoryOut])
+def get_subcategories_by_category(category_id: int, db: Session = Depends(get_db)):
+    subcategories = db.query(SubCategory).filter(SubCategory.category_id == category_id).all()
+    if not subcategories:
+        raise HTTPException(status_code=404, detail="No subcategories found for this category")
+    return subcategories
+
+
 @router.put("/{sub_category_id}", response_model=SubCategoryOut)
 def update_sub_category(
     sub_category_id: int,
@@ -71,6 +79,7 @@ def update_sub_category(
     sub_category.name = name
     sub_category.status = status
     sub_category.category_id = category_id
+    print(sub_category, "sub_category")
 
     db.commit()
     db.refresh(sub_category)

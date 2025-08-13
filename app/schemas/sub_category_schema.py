@@ -3,8 +3,8 @@ from typing import Optional
 from enum import Enum
 
 class SubCategoryStatus(str, Enum):
-    active = "Active"
-    inactive = "Inactive"
+    active = "active"
+    inactive = "inactive"
 
 class SubCategoryBase(BaseModel):
     name: str

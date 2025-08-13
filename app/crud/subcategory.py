@@ -25,6 +25,9 @@ def update_subcategory(db: Session, subcategory_id: int, subcategory: SubCategor
     db.refresh(db_subcategory)
     return db_subcategory
 
+
+
+
 def delete_subcategory(db: Session, subcategory_id: int):
     db_subcategory = get_subcategory(db, subcategory_id)
     if not db_subcategory:
