@@ -6,6 +6,7 @@ from app.crud import user as crud_user
 from app.models.user import User
 from app.core.dependencies import get_super_admin
 
+
 router = APIRouter(prefix="/users", tags=["User Management & Auth"])
 
 # 🔐 User Auth — Login via OTP
@@ -137,3 +138,18 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db), _: User = De
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+
+
+# ⚡ Get Vendors & Charges by Category & Subcategory
+@router.get("/vendors-charges/{category_id}/{subcategory_id}")
+def get_vendors_and_charges(
+    category_id: int,
+    subcategory_id: int,
+    db: Session = Depends(get_db)
+):
+    data = crud_user.fetch_service_charges_and_vendors(db, category_id, subcategory_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="No vendors found for this category/subcategory")
+    return data

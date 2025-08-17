@@ -1,60 +1,3 @@
-# from sqlalchemy.orm import Session
-# from typing import Optional
-# from app.models.user import User, UserStatus
-# from app.schemas.user_schema import UserCreate, UserUpdate
-# from app.core.security import get_password_hash
-
-# def get_user_by_email(db: Session, email: str):
-#     return db.query(User).filter(User.email == email).first()
-
-# def create_user(db: Session, user: UserCreate):
-#     hashed_password = get_password_hash(user.password)
-#     db_user = User(
-#         name=user.name,
-#         email=user.email,
-#         hashed_password=hashed_password,
-#         status=UserStatus.active
-#     )
-#     db.add(db_user)
-#     db.commit()
-#     db.refresh(db_user)
-#     return db_user
-
-# def get_users(db: Session, skip: int = 0, limit: int = 10):
-#     return db.query(User).offset(skip).limit(limit).all()
-
-# def delete_user(db: Session, user_id: int) -> bool:
-#     user = db.query(User).get(user_id)
-#     if not user:
-#         return False
-#     db.delete(user)
-#     db.commit()
-#     return True
-
-# def update_user(db: Session, user_id: int, data: UserUpdate) -> Optional[User]:
-#     user = db.query(User).get(user_id)
-#     if not user:
-#         return None
-#     if data.name is not None:
-#         user.name = data.name
-#     if data.email is not None:
-#         user.email = data.email
-#     if data.password is not None:
-#         user.hashed_password = get_password_hash(data.password)
-#     if data.status is not None:
-#         user.status = data.status
-#     db.commit()
-#     db.refresh(user)
-#     return user
-
-# def toggle_user_status(db: Session, user_id: int) -> Optional[User]:
-#     user = db.query(User).get(user_id)
-#     if not user:
-#         return None
-#     user.status = UserStatus.blocked if user.status == UserStatus.active else UserStatus.active
-#     db.commit()
-#     db.refresh(user)
-#     return user
 
 
 from sqlalchemy.orm import Session
@@ -198,3 +141,72 @@ def verify_login_otp(db, email: str, otp: str):
     db.commit()
     db.refresh(user)
     return user
+
+
+
+
+
+
+
+
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from app.models.sub_category import SubCategory
+from app.models.category import Category
+from app.models.service_provider_model import ServiceProvider
+from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
+
+
+def fetch_service_charges_and_vendors(db: Session, category_id: int, sub_category_id: int):
+    
+    category = db.query(Category).filter(Category.id == category_id).first()
+    subcategory = db.query(SubCategory).filter(SubCategory.id == sub_category_id).first()
+
+    if not category or not subcategory:
+        return None
+
+    # Query VendorSubcategoryCharge with joins
+    results = (
+        db.query(
+            VendorSubcategoryCharge.service_charge,
+            ServiceProvider.id.label("vendor_id"),
+            ServiceProvider.full_name,
+            ServiceProvider.email,
+            ServiceProvider.phone,
+            ServiceProvider.city,
+            ServiceProvider.state,
+            ServiceProvider.profile_pic,
+        )
+        .join(ServiceProvider, ServiceProvider.id == VendorSubcategoryCharge.vendor_id)
+        .filter(
+            and_(
+                VendorSubcategoryCharge.category_id == category_id,
+                VendorSubcategoryCharge.subcategory_id == sub_category_id,
+            )
+        )
+        .all()
+    )
+
+    if not results:
+        return []
+
+    response = []
+    for row in results:
+        response.append({
+            "service_charge": row.service_charge,
+            "vendor_details": {
+                "id": row.vendor_id,
+                "name": row.full_name,
+                "email": row.email,
+                "contact": row.phone,
+                "city": row.city,
+                "state": row.state,
+                "profile_pic": row.profile_pic
+            }
+        })
+
+    return {
+        "category": {"id": category.id, "name": category.name},
+        "subcategory": {"id": subcategory.id, "name": subcategory.name},
+        "vendors": response
+    }
