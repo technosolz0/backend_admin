@@ -1,4 +1,3 @@
-# app/crud/booking_crud.py
 from sqlalchemy.orm import Session
 from app.models.booking_model import Booking, BookingStatus
 from app.schemas.booking_schema import BookingCreate
@@ -23,14 +22,10 @@ def update_booking_status(db: Session, booking: Booking, new_status: str, otp: s
         otp_code = generate_otp()
         booking.otp = otp_code
         booking.otp_created_at = datetime.utcnow()
-
-        # Send OTP to user email
         send_email_otp(booking.user.email, otp_code)
-
     elif new_status == BookingStatus.completed:
         if not otp or otp != booking.otp:
             raise ValueError("Invalid or missing OTP for completion.")
-
     booking.status = new_status
     db.commit()
     db.refresh(booking)
