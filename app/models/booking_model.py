@@ -81,3 +81,5 @@ class Booking(Base):
     # Relationships
     user = relationship("User", backref="bookings")
     service_provider = relationship("ServiceProvider", backref="bookings")
+    category = relationship("Category", backref="bookings")
+    subcategory = relationship("SubCategory", backref="bookings")

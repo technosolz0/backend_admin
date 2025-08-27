@@ -103,6 +103,12 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db), user=D
     booking_result = booking_crud.create_booking(db, booking)
     logger.info(f"Booking created successfully: ID {booking_result.id}")
     return booking_result
+@router.get("/", response_model=list[BookingOut])
+def get_all_bookings(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    bookings = booking_crud.get_bookings_by_user_id(db, user.id)
+    if not bookings:
+        return []
+    return bookings
 
 @router.post("/{booking_id}/payment", response_model=PaymentOut)
 def create_payment(booking_id: int, payment: PaymentCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):

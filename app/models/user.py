@@ -36,3 +36,4 @@ class User(Base):
 
     last_login_at = Column(DateTime, nullable=True)
     login_logs = relationship("LoginLog", back_populates="user", lazy='joined')
+    addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")

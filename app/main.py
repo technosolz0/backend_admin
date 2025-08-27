@@ -11,7 +11,7 @@ from app.api.routes import (
     category_routes,
     user_routes,
     service_provider_routes,
-    sub_category_routes,booking_routes,payment_route
+    sub_category_routes,booking_routes,payment_route,user_address_router
 )
 
 from app.database import Base, engine
@@ -54,6 +54,7 @@ app.include_router(service_provider_routes.router, prefix="/api")
 
 app.include_router(booking_routes.router, prefix="/api")
 app.include_router(payment_route.router, prefix="/api")
+app.include_router(user_address_router.router, prefix="/api")
 
 
 

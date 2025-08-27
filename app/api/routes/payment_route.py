@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["Payment"])
 
 # Initialize Razorpay client
-razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+try:
+    if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+        logger.error("Razorpay credentials missing in configuration")
+        raise ValueError("Razorpay API credentials are not configured")
+    razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+except Exception as e:
+    logger.error(f"Failed to initialize Razorpay client: {str(e)}")
+    raise ValueError(f"Razorpay initialization failed: {str(e)}")
 
 class OrderCreate(BaseModel):
     amount: int  # Amount in rupees
@@ -22,9 +29,6 @@ class OrderCreate(BaseModel):
 @router.post("/create-order")
 def create_order(order: OrderCreate, user=Depends(get_current_user)):
     try:
-        if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
-            logger.error("Razorpay credentials missing")
-            raise HTTPException(status_code=500, detail="Razorpay configuration error")
         order_data = {
             "amount": order.amount * 100,  # Convert to paise
             "currency": order.currency,
@@ -38,6 +42,11 @@ def create_order(order: OrderCreate, user=Depends(get_current_user)):
             "amount": order.amount,
             "currency": order.currency
         }
+    except razorpay.errors.BadRequestError as e:
+        logger.error(f"Razorpay API error for user {user.id}: {str(e)}")
+        if "Authentication failed" in str(e):
+            raise HTTPException(status_code=500, detail="Razorpay authentication failed. Please check API credentials.")
+        raise HTTPException(status_code=400, detail=f"Razorpay API error: {str(e)}")
     except Exception as e:
         logger.error(f"Error creating Razorpay order for user {user.id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}")

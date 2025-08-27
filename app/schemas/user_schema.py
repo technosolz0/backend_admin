@@ -1,32 +1,3 @@
-# from pydantic import BaseModel, EmailStr
-# from typing import Optional
-# from enum import Enum
-
-# class UserStatus(str, Enum):
-#     active = "active"
-#     blocked = "blocked"
-
-# class UserCreate(BaseModel):
-#     name: str
-#     email: EmailStr
-#     password: str
-
-# class UserUpdate(BaseModel):
-#     name: Optional[str] = None
-#     email: Optional[EmailStr] = None
-#     password: Optional[str] = None
-#     status: Optional[UserStatus] = None
-
-# class UserOut(BaseModel):
-#     id: int
-#     name: str
-#     email: EmailStr
-#     status: UserStatus
-
-    # model_config = {
-    #     "from_attributes": True
-    # }
-
 
 
 from pydantic import BaseModel, EmailStr

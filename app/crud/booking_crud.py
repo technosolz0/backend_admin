@@ -11,6 +11,8 @@ def create_booking(db: Session, booking_data: BookingCreate):
     db.commit()
     db.refresh(booking)
     return booking
+def get_bookings_by_user_id(db: Session, user_id: int):
+    return db.query(Booking).filter(Booking.user_id == user_id).all()
 
 
 def get_booking_by_id(db: Session, booking_id: int):

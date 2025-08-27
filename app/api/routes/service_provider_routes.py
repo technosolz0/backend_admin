@@ -42,24 +42,6 @@ def get_subcategories(category_id: Optional[int] = None, db: Session = Depends(g
 
 
 
-
-# @router.post("/login")
-# def vendor_login(data: VendorLoginRequest, db: Session = Depends(get_db)):
-#     try:
-#         vendor = db.query(ServiceProvider).filter(ServiceProvider.email == data.email).first()
-#         if not vendor:
-#             raise HTTPException(status_code=404, detail="Vendor not found")
-        
-#         if not verify_password(data.password, vendor.password):
-#             raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-#         token = create_access_token({"sub": vendor.email, "role": "vendor"})
-#         return {"access_token": token, "token_type": "bearer"}
-#     except Exception as e:
-#         import traceback
-#         print("Vendor login error:", e)
-#         traceback.print_exc()
-#         raise
 @router.post("/login", response_model=dict)
 def vendor_login(data: VendorLoginRequest, db: Session = Depends(get_db)):
     try:
@@ -140,6 +122,13 @@ def resend_otp_endpoint(data: OTPRequest, db: Session = Depends(get_db)):
 def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor)):
     """Retrieve the current vendor's details."""
     return current_vendor
+@router.get("/{vendor_id}", response_model=VendorResponse)
+def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
+    """Retrieve vendor details by vendor_id."""
+    vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return vendor
 
 @router.put("/profile/address", response_model=VendorResponse)
 def update_address_details(

@@ -40,6 +40,8 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from app.models.booking_model import BookingStatus
+from app.schemas.category_schema import CategoryOut
+from app.schemas.sub_category_schema import SubCategoryOut
 
 
 class BookingCreate(BaseModel):
@@ -62,6 +64,10 @@ class BookingOut(BaseModel):
     created_at: datetime
     otp: Optional[str]
     otp_created_at: Optional[datetime]
+
+    category: CategoryOut
+    subcategory: SubCategoryOut
+    
 
     class Config:
         from_attributes = True
