@@ -34,6 +34,8 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     # Add your production domains here
+    "http://194.164.148.133:3000",
+    "http://10.108.231.167:3000",
 ]
 
 app.add_middleware(
@@ -87,4 +89,4 @@ app.openapi = custom_openapi
 
 @app.get("/")
 def root():
-    return {"message": "Servex API is running ✅"}
+    return {"message": "Serwex API is running ✅"}
