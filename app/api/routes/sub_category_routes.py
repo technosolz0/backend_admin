@@ -8,6 +8,27 @@ from uuid import uuid4
 
 router = APIRouter(prefix="/subcategories", tags=["subcategories"])
 
+UPLOAD_DIR = "static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def save_image(image: UploadFile, old_image: str = None) -> str:
+    """Save uploaded image, delete old if exists, return new path."""
+    # delete old image
+    if old_image:
+        old_path = old_image.lstrip("/")  # remove leading slash if any
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    # save new image
+    filename = f"{uuid4().hex}_{image.filename}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    return f"/{UPLOAD_DIR}/{filename}"
+
+
 @router.post("/", response_model=SubCategoryOut, status_code=status.HTTP_201_CREATED)
 def create_sub_category(
     name: str = Form(...),
@@ -16,14 +37,7 @@ def create_sub_category(
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    image_path = None
-    if image:
-        filename = f"{uuid4().hex}_{image.filename}"
-        image_path = os.path.join("static/uploads", filename)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
-        with open(image_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-        image_path = f"/static/uploads/{filename}"
+    image_path = save_image(image) if image else None
 
     new_sub_category = SubCategory(
         name=name,
@@ -36,9 +50,11 @@ def create_sub_category(
     db.refresh(new_sub_category)
     return new_sub_category
 
+
 @router.get("/", response_model=list[SubCategoryOut])
 def list_sub_categories(db: Session = Depends(get_db)):
     return db.query(SubCategory).all()
+
 
 @router.get("/{sub_category_id}", response_model=SubCategoryOut)
 def get_sub_category(sub_category_id: int, db: Session = Depends(get_db)):
@@ -46,6 +62,7 @@ def get_sub_category(sub_category_id: int, db: Session = Depends(get_db)):
     if not sub_category:
         raise HTTPException(status_code=404, detail="Sub-category not found")
     return sub_category
+
 
 @router.get("/by-category/{category_id}", response_model=list[SubCategoryOut])
 def get_subcategories_by_category(category_id: int, db: Session = Depends(get_db)):
@@ -69,21 +86,16 @@ def update_sub_category(
         raise HTTPException(status_code=404, detail="Sub-category not found")
 
     if image:
-        filename = f"{uuid4().hex}_{image.filename}"
-        image_path = os.path.join("static/uploads", filename)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
-        with open(image_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-        sub_category.image = f"/static/uploads/{filename}"
+        sub_category.image = save_image(image, sub_category.image)
 
     sub_category.name = name
     sub_category.status = status
     sub_category.category_id = category_id
-    print(sub_category, "sub_category")
 
     db.commit()
     db.refresh(sub_category)
     return sub_category
+
 
 @router.patch("/{sub_category_id}", response_model=SubCategoryOut)
 def partial_update_sub_category(
@@ -105,31 +117,39 @@ def partial_update_sub_category(
     if category_id:
         sub_category.category_id = category_id
     if image:
-        filename = f"{uuid4().hex}_{image.filename}"
-        image_path = os.path.join("static/uploads", filename)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
-        with open(image_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-        sub_category.image = f"/static/uploads/{filename}"
+        sub_category.image = save_image(image, sub_category.image)
 
     db.commit()
     db.refresh(sub_category)
     return sub_category
+
 
 @router.delete("/{sub_category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_sub_category(sub_category_id: int, db: Session = Depends(get_db)):
     sub_category = db.query(SubCategory).filter(SubCategory.id == sub_category_id).first()
     if not sub_category:
         raise HTTPException(status_code=404, detail="Sub-category not found")
+
+    if sub_category.image:
+        old_path = sub_category.image.lstrip("/")
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
     db.delete(sub_category)
     db.commit()
+
 
 @router.post("/{sub_category_id}/toggle-status", response_model=SubCategoryOut)
 def toggle_sub_category_status(sub_category_id: int, db: Session = Depends(get_db)):
     sub_category = db.query(SubCategory).filter(SubCategory.id == sub_category_id).first()
     if not sub_category:
         raise HTTPException(status_code=404, detail="Sub-category not found")
-    sub_category.status = 'Inactive' if sub_category.status == 'Active' else 'Active'
+
+    sub_category.status = (
+        SubCategoryStatus.inactive
+        if sub_category.status == SubCategoryStatus.active
+        else SubCategoryStatus.active
+    )
     db.commit()
     db.refresh(sub_category)
     return sub_category
