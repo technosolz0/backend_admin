@@ -259,7 +259,7 @@ from typing import List, Optional
 from app.models.service_provider_model import ServiceProvider
 from app.models.category import Category
 from app.models.sub_category import SubCategory
-from app.models.service import Service  # Assuming Service model exists
+#from app.models.service import Service  # Assuming Service model exists
 from app.schemas.service_provider_schema import (
     VendorCreate, VendorResponse, OTPRequest, OTPVerify,
     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest
