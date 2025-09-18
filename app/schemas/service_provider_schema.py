@@ -72,7 +72,7 @@ class VendorResponse(BaseModel):
     address_doc_url: Optional[str] = None
     category_id: Optional[int] = None
     profile_pic: Optional[str] = None
-    status: str = Field(..., pattern="^(pending|approved|rejected)$")
+    status: str = Field(..., pattern="^(pending|approved|rejected|inactive)$")
     admin_status: str = Field(..., pattern="^(active|inactive)$")
     work_status: str = Field(..., pattern="^(work_on|work_off)$")
     subcategory_charges: List[SubCategoryCharge]

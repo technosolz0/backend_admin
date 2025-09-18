@@ -39,7 +39,7 @@ class ServiceProvider(Base):
     device_name = Column(String)
     last_device_update = Column(DateTime)
 
-    status = Column(SAEnum('pending', 'approved', 'rejected', name='vendor_status'), default='approved')
+    status = Column(SAEnum('pending', 'approved', 'rejected', 'inactive', name='vendor_status'), default='approved')
     admin_status = Column(SAEnum('active', 'inactive', name='admin_status'), default='active')
     work_status = Column(SAEnum('work_on', 'work_off', name='work_status'), default='work_on')
 

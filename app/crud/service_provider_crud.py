@@ -1,669 +1,4 @@
-# from datetime import datetime, timedelta
-# from fastapi import HTTPException, UploadFile
-# from passlib.context import CryptContext
-# from sqlalchemy.orm import Session
-# from sqlalchemy.exc import SQLAlchemyError
-# from app.utils.otp_utils import generate_otp, send_email_otp
-# from app.core.security import get_password_hash
-# from app.models.service_provider_model import ServiceProvider
-# from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
-# from app.models.sub_category import SubCategory
-# from app.models.category import Category
-# from app.schemas.service_provider_schema import (
-#     VendorCreate, VendorDeviceUpdate, AddressDetailsUpdate, 
-#     BankDetailsUpdate, WorkDetailsUpdate, SubCategoryCharge, VendorResponse
-# )
-# import logging
 
-# from app.schemas.sub_category_schema import SubCategoryStatus
-
-# logging.basicConfig(level=logging.DEBUG)
-# logger = logging.getLogger(__name__)
-
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-# OTP_EXPIRY_MINUTES = 5
-# MAX_OTP_ATTEMPTS = 3
-# MAX_OTP_RESENDS = 3
-# OTP_RESEND_COOLDOWN_MINUTES = 1
-
-# def verify_password(plain_password: str, hashed_password: str) -> bool:
-#     return pwd_context.verify(plain_password, hashed_password)
-
-# def get_vendor_by_email(db: Session, email: str) -> ServiceProvider:
-#     return db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
-
-# def get_subcategory_by_id(db: Session, subcategory_id: int) -> SubCategory:
-#     return db.query(SubCategory).filter(SubCategory.id == subcategory_id).first()
-
-# def get_category_by_id(db: Session, category_id: int) -> Category:
-#     return db.query(Category).filter(Category.id == category_id).first()
-
-# def attach_subcategory_charges(db: Session, vendor_id: int) -> list[SubCategoryCharge]:
-#     charges = db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).all()
-#     return [
-#         SubCategoryCharge(subcategory_id=charge.subcategory_id, service_charge=charge.service_charge)
-#         for charge in charges
-#     ]
-
-# def vendor_login(db: Session, email: str, password: str) -> tuple[VendorResponse, str]:
-#     vendor = get_vendor_by_email(db, email)
-#     if not vendor:
-#         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     if not verify_password(password, vendor.password):
-#         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-#     vendor.last_login = datetime.utcnow()
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response, "Login successful"
-
-# def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
-#     existing = get_vendor_by_email(db, email=vendor.email)
-#     if existing and existing.otp_verified:
-#         raise HTTPException(status_code=400, detail="Email already registered")
-    
-#     if existing and not existing.otp_verified:
-#         existing.full_name = vendor.full_name
-#         existing.phone = vendor.phone
-#         existing.password = get_password_hash(vendor.password)
-#         existing.terms_accepted = vendor.terms_accepted
-#         existing.identity_doc_type = vendor.identity_doc_type
-#         existing.identity_doc_number = vendor.identity_doc_number
-#         existing.fcm_token = vendor.fcm_token
-#         existing.latitude = vendor.latitude
-#         existing.longitude = vendor.longitude
-#         existing.device_name = vendor.device_name
-#         existing.profile_pic = vendor.profile_pic
-#         existing.otp = generate_otp()
-#         existing.otp_created_at = datetime.utcnow()
-#         existing.otp_last_sent_at = datetime.utcnow()
-#         db.commit()
-#         db.refresh(existing)
-#         send_email_otp(vendor.email, existing.otp)
-#         return existing
-    
-#     hashed_password = get_password_hash(vendor.password)
-#     otp = generate_otp()
-#     now = datetime.utcnow()
-    
-#     db_vendor = ServiceProvider(
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         password=hashed_password,
-#         profile_pic=vendor.profile_pic,
-#         terms_accepted=vendor.terms_accepted,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         fcm_token=vendor.fcm_token,
-#         latitude=vendor.latitude,
-#         longitude=vendor.longitude,
-#         device_name=vendor.device_name,
-#         otp=otp,
-#         otp_created_at=now,
-#         otp_last_sent_at=now,
-#         otp_verified=False,
-#         last_login=now,
-#         last_device_update=now,
-#         status='pending',
-#         admin_status='inactive',
-#         work_status='work_on'
-#     )
-#     db.add(db_vendor)
-#     db.commit()
-#     db.refresh(db_vendor)
-    
-#     send_email_otp(vendor.email, otp)
-#     return db_vendor
-
-# def verify_vendor_otp(db: Session, email: str, otp: str) -> tuple[VendorResponse, str]:
-#     vendor = get_vendor_by_email(db, email)
-#     if not vendor:
-#         return None, "Vendor not found"
-    
-#     if vendor.otp_attempts >= MAX_OTP_ATTEMPTS:
-#         return None, "Maximum OTP attempts exceeded"
-    
-#     if vendor.otp != otp:
-#         vendor.otp_attempts += 1
-#         db.commit()
-#         return None, "Invalid OTP"
-    
-#     if (datetime.utcnow() - vendor.otp_created_at) > timedelta(minutes=OTP_EXPIRY_MINUTES):
-#         return None, "OTP expired"
-    
-#     vendor.otp_verified = True
-#     vendor.otp_attempts = 0
-#     vendor.status = 'pending'
-#     vendor.last_login = datetime.utcnow()
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response, "OTP verified successfully"
-
-# def resend_otp(db: Session, email: str) -> None:
-#     vendor = get_vendor_by_email(db, email)
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail="Vendor not found")
-    
-#     if vendor.otp_last_sent_at and (datetime.utcnow() - vendor.otp_last_sent_at) < timedelta(minutes=OTP_RESEND_COOLDOWN_MINUTES):
-#         raise HTTPException(status_code=429, detail="Please wait before requesting a new OTP")
-    
-#     if vendor.otp_attempts >= MAX_OTP_RESENDS:
-#         raise HTTPException(status_code=429, detail="Maximum OTP resend attempts exceeded")
-    
-#     otp = generate_otp()
-#     vendor.otp = otp
-#     vendor.otp_created_at = datetime.utcnow()
-#     vendor.otp_last_sent_at = datetime.utcnow()
-#     vendor.otp_attempts = 0
-#     send_email_otp(email, otp)
-#     db.commit()
-
-# def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     for field, value in update.dict(exclude_unset=True).items():
-#         setattr(vendor, field, value)
-    
-#     vendor.last_device_update = datetime.utcnow()
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response
-
-# def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     for field, value in update.dict(exclude_unset=True).items():
-#         setattr(vendor, field, value)
-    
-#     vendor.last_device_update = datetime.utcnow()
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response
-# def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -> VendorResponse:
-#     logger.debug(f"Updating work details for vendor_id: {vendor_id}, update: {update.dict()}")
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         logger.error(f"Vendor with ID {vendor_id} not found")
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-
-#     if not vendor.otp_verified:
-#         logger.error(f"Vendor {vendor_id} not OTP verified")
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-
-#     if not update.subcategory_charges:
-#         logger.error("No subcategory charges provided")
-#         raise HTTPException(status_code=400, detail="At least one subcategory charge is required")
-
-#     category = get_category_by_id(db, update.category_id)
-#     if not category:
-#         logger.error(f"Category {update.category_id} not found")
-#         raise HTTPException(status_code=404, detail=f"Category {update.category_id} not found")
-
-#     try:
-#         logger.debug(f"Setting category_id: {update.category_id}")
-#         vendor.category_id = update.category_id
-
-#         logger.debug(f"Deleting existing charges for vendor_id: {vendor_id}")
-#         vendor.subcategory_charges.clear()  # Assumes relationship fixed per previous response
-
-#         for charge in update.subcategory_charges:
-#             logger.debug(f"Processing subcategory charge: {charge}")
-#             if charge.service_charge < 0:
-#                 logger.error(f"Negative service charge: {charge.service_charge}")
-#                 raise HTTPException(status_code=400, detail="Service charge cannot be negative")
-#             subcategory = get_subcategory_by_id(db, charge.subcategory_id)
-#             if not subcategory:
-#                 logger.error(f"Subcategory {charge.subcategory_id} not found")
-#                 raise HTTPException(status_code=404, detail=f"Subcategory {charge.subcategory_id} not found")
-#             if subcategory.category_id != update.category_id:
-#                 logger.error(f"Subcategory {charge.subcategory_id} does not belong to category {update.category_id}")
-#                 raise HTTPException(status_code=400, detail=f"Subcategory {charge.subcategory_id} does not belong to category {update.category_id}")
-#             # Validate subcategory status
-#             if subcategory.status not in [SubCategoryStatus.active, SubCategoryStatus.inactive]:
-#                 logger.error(f"Invalid status for subcategory {charge.subcategory_id}: {subcategory.status}")
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail=f"Invalid status for subcategory {charge.subcategory_id}: {subcategory.status}"
-#                 )
-
-#             new_charge = VendorSubcategoryCharge(
-#                 subcategory_id=charge.subcategory_id,
-#                 category_id=update.category_id,
-#                 service_charge=charge.service_charge,
-#             )
-#             logger.debug(f"Inserting charge: vendor_id={vendor_id}, subcategory_id={charge.subcategory_id}, service_charge={charge.service_charge}")
-#             vendor.subcategory_charges.append(new_charge)
-
-#         vendor.status = 'approved'
-#         vendor.last_device_update = datetime.utcnow()
-#         logger.debug(f"Committing changes for vendor_id: {vendor_id}")
-#         db.commit()
-#         db.refresh(vendor)
-        
-#         subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#         vendor_response = VendorResponse(
-#             id=vendor.id,
-#             full_name=vendor.full_name,
-#             email=vendor.email,
-#             phone=vendor.phone,
-#             address=vendor.address,
-#             state=vendor.state,
-#             city=vendor.city,
-#             pincode=vendor.pincode,
-#             account_holder_name=vendor.account_holder_name,
-#             account_number=vendor.account_number,
-#             ifsc_code=vendor.ifsc_code,
-#             upi_id=vendor.upi_id,
-#             identity_doc_type=vendor.identity_doc_type,
-#             identity_doc_number=vendor.identity_doc_number,
-#             identity_doc_url=vendor.identity_doc_url,
-#             bank_doc_type=vendor.bank_doc_type,
-#             bank_doc_number=vendor.bank_doc_number,
-#             bank_doc_url=vendor.bank_doc_url,
-#             address_doc_type=vendor.address_doc_type,
-#             address_doc_number=vendor.address_doc_number,
-#             address_doc_url=vendor.address_doc_url,
-#             category_id=vendor.category_id,
-#             profile_pic=vendor.profile_pic,
-#             status=vendor.status,
-#             admin_status=vendor.admin_status,
-#             work_status=vendor.work_status,
-#             subcategory_charges=subcategory_charges
-#         )
-#         logger.info(f"Vendor work details updated successfully: {vendor.id}")
-#         return vendor_response
-#     except HTTPException as e:
-#         db.rollback()
-#         logger.error(f"HTTPException in update_vendor_work: {str(e)}")
-#         raise e
-#     except SQLAlchemyError as e:
-#         db.rollback()
-#         logger.error(f"SQLAlchemyError in update_vendor_work: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-#     except Exception as e:
-#         db.rollback()
-#         logger.error(f"Unexpected error in update_vendor_work: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-# import os
-# from pathlib import Path
-# from fastapi import HTTPException, UploadFile
-# from sqlalchemy.orm import Session
-# from app.models.service_provider_model import ServiceProvider
-# from app.schemas.service_provider_schema import VendorResponse
-# from datetime import datetime
-# import logging
-
-# logger = logging.getLogger(__name__)
-
-# def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile | None, identity_doc: UploadFile, bank_doc: UploadFile, address_doc: UploadFile) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf'}
-#     max_file_size = 5 * 1024 * 1024  # 5MB
-#     upload_base_dir = os.getenv("UPLOAD_DIR", "uploads")  # Configurable base directory
-
-#     def save_file(file: UploadFile, subdir: str, prefix: str) -> str:
-#         """Save an uploaded file to the specified subdirectory with error handling."""
-#         try:
-#             ext = file.filename.split(".")[-1].lower() if file.filename else ""
-#             if ext not in allowed_extensions:
-#                 logger.error(f"Invalid file type for {prefix}: {ext}")
-#                 raise HTTPException(status_code=400, detail=f"Invalid {prefix} file type. Allowed: {', '.join(allowed_extensions)}")
-#             if file.size > max_file_size:
-#                 logger.error(f"{prefix} file too large: {file.size} bytes")
-#                 raise HTTPException(status_code=400, detail=f"{prefix} file too large. Max size: {max_file_size} bytes")
-            
-#             file_path = Path(upload_base_dir) / subdir / f"{prefix}_{vendor_id}.{ext}"
-#             file_path.parent.mkdir(parents=True, exist_ok=True)  # Create directories if they don't exist
-#             with file_path.open("wb") as buffer:
-#                 buffer.write(file.file.read())
-#             logger.debug(f"Saved {prefix} file to {file_path}")
-#             return str(file_path)
-#         except Exception as e:
-#             logger.error(f"Error saving {prefix} file: {str(e)}")
-#             raise HTTPException(status_code=500, detail=f"Failed to save {prefix} file: {str(e)}")
-
-#     try:
-#         if profile_pic:
-#             vendor.profile_pic = save_file(profile_pic, "profiles", "profile")
-        
-#         vendor.identity_doc_url = save_file(identity_doc, "documents", "identity")
-#         vendor.bank_doc_url = save_file(bank_doc, "documents", "bank")
-#         vendor.address_doc_url = save_file(address_doc, "documents", "address")
-        
-#         vendor.last_device_update = datetime.utcnow()
-#         db.commit()
-#         db.refresh(vendor)
-        
-#         subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#         vendor_response = VendorResponse(
-#             id=vendor.id,
-#             full_name=vendor.full_name,
-#             email=vendor.email,
-#             phone=vendor.phone,
-#             address=vendor.address,
-#             state=vendor.state,
-#             city=vendor.city,
-#             pincode=vendor.pincode,
-#             account_holder_name=vendor.account_holder_name,
-#             account_number=vendor.account_number,
-#             ifsc_code=vendor.ifsc_code,
-#             upi_id=vendor.upi_id,
-#             identity_doc_type=vendor.identity_doc_type,
-#             identity_doc_number=vendor.identity_doc_number,
-#             identity_doc_url=vendor.identity_doc_url,
-#             bank_doc_type=vendor.bank_doc_type,
-#             bank_doc_number=vendor.bank_doc_number,
-#             bank_doc_url=vendor.bank_doc_url,
-#             address_doc_type=vendor.address_doc_type,
-#             address_doc_number=vendor.address_doc_number,
-#             address_doc_url=vendor.address_doc_url,
-#             category_id=vendor.category_id,
-#             profile_pic=vendor.profile_pic,
-#             status=vendor.status,
-#             admin_status=vendor.admin_status,
-#             work_status=vendor.work_status,
-#             subcategory_charges=subcategory_charges
-#         )
-#         logger.info(f"Documents updated successfully for vendor_id: {vendor_id}")
-#         return vendor_response
-#     except HTTPException as e:
-#         db.rollback()
-#         logger.error(f"HTTPException in update_vendor_documents: {str(e)}")
-#         raise e
-#     except SQLAlchemyError as e:
-#         db.rollback()
-#         logger.error(f"SQLAlchemyError in update_vendor_documents: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-#     except Exception as e:
-#         db.rollback()
-#         logger.error(f"Unexpected error in update_vendor_documents: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-# def update_vendor_device(db: Session, vendor_id: int, update: VendorDeviceUpdate) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     for field, value in update.dict(exclude_unset=True).items():
-#         setattr(vendor, field, value)
-    
-#     vendor.last_device_update = datetime.utcnow()
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response
-
-# def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if status not in ['active', 'inactive']:
-#         raise HTTPException(status_code=400, detail="Invalid admin status")
-    
-#     vendor.admin_status = status
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response
-
-# def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
-#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#     if not vendor:
-#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
-    
-#     if not vendor.otp_verified:
-#         raise HTTPException(status_code=403, detail="OTP verification required")
-    
-#     if vendor.admin_status != 'active':
-#         raise HTTPException(status_code=403, detail="Vendor must be active to change work status")
-    
-#     if status not in ['work_on', 'work_off']:
-#         raise HTTPException(status_code=400, detail="Invalid work status")
-    
-#     vendor.work_status = status
-#     db.commit()
-#     db.refresh(vendor)
-    
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-#     vendor_response = VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         profile_pic=vendor.profile_pic,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#     )
-#     return vendor_response
 
 
 
@@ -689,6 +24,7 @@ from typing import List, Tuple
 import os
 from pathlib import Path
 
+from app.utils.fcm import send_push_notification  
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -1325,6 +661,14 @@ def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> Vend
     vendor.admin_status = status
     db.commit()
     db.refresh(vendor)
+    if vendor.fcm_token:
+        send_push_notification(
+            token=vendor.fcm_token,
+            title="Status Update",
+            body=f"Your account status has been updated to {new_status}"
+        )
+
+    # return build_vendor_response(vendor, db)
     
     subcategory_charges = attach_subcategory_charges(db, vendor.id)
     vendor_response = VendorResponse(
@@ -1407,3 +751,200 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
         subcategory_charges=subcategory_charges
     )
     return vendor_response
+
+
+# import random
+# import string
+# import logging
+# from datetime import datetime, timedelta
+# from sqlalchemy.orm import Session
+# from fastapi import UploadFile, HTTPException
+# from app.models.service_provider_model import Vendor
+# from app.schemas.service_provider_schema import VendorCreate, VendorUpdate, VendorResponse
+# from app.utils.otp_utils import generate_otp, send_email_otp
+# from app.utils.file_upload import upload_file_to_s3
+# from app.utils.fcm import send_push_notification  # 🔔 new helper for FCM
+
+# logger = logging.getLogger(__name__)
+
+
+# # ---------------- Helper Functions ---------------- #
+
+# def build_vendor_response(vendor: Vendor, db: Session) -> VendorResponse:
+#     """Builds a consistent vendor response"""
+#     return VendorResponse(
+#         id=vendor.id,
+#         full_name=vendor.full_name,
+#         email=vendor.email,
+#         phone=vendor.phone,
+#         business_name=vendor.business_name,
+#         services=vendor.services,
+#         profile_image=vendor.profile_image,
+#         status=vendor.status,
+#         created_at=vendor.created_at,
+#         updated_at=vendor.updated_at,
+#         fcm_token=vendor.fcm_token
+#     )
+
+
+# def validate_vendor_exists(vendor: Vendor, vendor_id: int):
+#     if not vendor:
+#         logger.error(f"Vendor not found | vendor_id={vendor_id}")
+#         raise HTTPException(status_code=404, detail="Vendor not found")
+
+
+# # ---------------- Vendor CRUD Services ---------------- #
+
+# def create_vendor(db: Session, vendor: VendorCreate):
+#     db_vendor = Vendor(
+#         full_name=vendor.full_name,
+#         email=vendor.email,
+#         phone=vendor.phone,
+#         business_name=vendor.business_name,
+#         services=vendor.services,
+#         otp=generate_otp(),
+#         otp_expiry=datetime.utcnow() + timedelta(minutes=10),
+#         otp_attempts=0,
+#         otp_resend_count=0,  # new field
+#         fcm_token=vendor.fcm_token
+#     )
+#     db.add(db_vendor)
+#     db.commit()
+#     db.refresh(db_vendor)
+
+#     send_email_otp(db_vendor.email, db_vendor.otp)
+#     logger.info(f"Vendor created | vendor_id={db_vendor.id}, email={db_vendor.email}")
+#     return build_vendor_response(db_vendor, db)
+
+
+# def get_vendor(db: Session, vendor_id: int):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+#     return build_vendor_response(vendor, db)
+
+
+# def get_all_vendors(db: Session, skip: int = 0, limit: int = 10):
+#     vendors = db.query(Vendor).offset(skip).limit(limit).all()
+#     total = db.query(Vendor).count()
+#     return {
+#         "total": total,
+#         "page": (skip // limit) + 1,
+#         "limit": limit,
+#         "vendors": [build_vendor_response(v, db) for v in vendors]
+#     }
+
+
+# def update_vendor(db: Session, vendor_id: int, vendor_update: VendorUpdate):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+
+#     for key, value in vendor_update.dict(exclude_unset=True).items():
+#         setattr(vendor, key, value)
+
+#     vendor.updated_at = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+
+#     logger.info(f"Vendor updated | vendor_id={vendor.id}")
+#     return build_vendor_response(vendor, db)
+
+
+# def delete_vendor(db: Session, vendor_id: int):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+#     db.delete(vendor)
+#     db.commit()
+#     logger.info(f"Vendor deleted | vendor_id={vendor_id}")
+#     return {"message": "Vendor deleted successfully"}
+
+
+# # ---------------- OTP Services ---------------- #
+
+# def verify_vendor_otp(db: Session, vendor_id: int, otp: str):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+
+#     if datetime.utcnow() > vendor.otp_expiry:
+#         logger.error(f"OTP expired | vendor_id={vendor.id}")
+#         raise HTTPException(status_code=400, detail="OTP expired")
+
+#     if vendor.otp != otp:
+#         vendor.otp_attempts += 1
+#         db.commit()
+#         logger.error(f"Invalid OTP | vendor_id={vendor.id}, attempts={vendor.otp_attempts}")
+#         raise HTTPException(status_code=400, detail="Invalid OTP")
+
+#     vendor.is_verified = True
+#     vendor.otp = None
+#     vendor.otp_attempts = 0
+#     db.commit()
+#     db.refresh(vendor)
+
+#     logger.info(f"Vendor OTP verified | vendor_id={vendor.id}")
+#     return build_vendor_response(vendor, db)
+
+
+# def resend_otp(db: Session, vendor_id: int):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+
+#     if vendor.otp_resend_count >= 3:
+#         logger.error(f"OTP resend limit exceeded | vendor_id={vendor.id}")
+#         raise HTTPException(status_code=400, detail="OTP resend limit exceeded")
+
+#     vendor.otp = generate_otp()
+#     vendor.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+#     vendor.otp_resend_count += 1
+#     db.commit()
+#     db.refresh(vendor)
+
+#     send_email_otp(vendor.email, vendor.otp)
+#     logger.info(f"OTP resent | vendor_id={vendor.id}")
+#     return {"message": "OTP resent successfully"}
+
+
+# # ---------------- File Upload ---------------- #
+
+# def upload_vendor_file(db: Session, vendor_id: int, file: UploadFile):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+
+#     # ✅ Fix: Correct file size validation
+#     file.file.seek(0, 2)  # move cursor to end
+#     size = file.file.tell()
+#     file.file.seek(0)
+#     if size > 5 * 1024 * 1024:
+#         raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+
+#     file_url = upload_file_to_s3(file, "vendor_uploads")
+#     vendor.profile_image = file_url
+#     vendor.updated_at = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+
+#     logger.info(f"Vendor file uploaded | vendor_id={vendor.id}, file_url={file_url}")
+#     return {"file_url": file_url}
+
+
+# # ---------------- Admin Status Update + FCM Notification ---------------- #
+
+# def update_vendor_status(db: Session, vendor_id: int, new_status: str):
+#     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+#     validate_vendor_exists(vendor, vendor_id)
+
+#     vendor.status = new_status
+#     vendor.updated_at = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+
+#     logger.info(f"Vendor status updated | vendor_id={vendor.id}, status={new_status}")
+
+#     # 🔔 Send FCM Notification
+#     if vendor.fcm_token:
+#         send_push_notification(
+#             token=vendor.fcm_token,
+#             title="Status Update",
+#             body=f"Your account status has been updated to {new_status}"
+#         )
+
+#     return build_vendor_response(vendor, db)
