@@ -265,6 +265,35 @@ def get_recent_payments(
         logger.error(f"Error retrieving recent payments: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve recent payments")
 
+@router.get("/analytics")
+def get_user_payment_analytics(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    start_date: Optional[date] = Query(None, description="Start date for analytics"),
+    end_date: Optional[date] = Query(None, description="End date for analytics")
+):
+    """Get payment analytics for the current user"""
+    try:
+        # Convert dates to datetime if provided
+        start_datetime = datetime.combine(start_date, datetime.min.time()) if start_date else None
+        end_datetime = datetime.combine(end_date, datetime.max.time()) if end_date else None
+        
+        analytics = payment_crud.get_payment_analytics(
+            db, user_id=user.id, 
+            start_date=start_datetime, 
+            end_date=end_datetime
+        )
+        
+        recent_payments = payment_crud.get_recent_payments(db, user_id=user.id, limit=5)
+        
+        return {
+            **analytics,
+            "recent_payments": recent_payments
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving user payment analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve payment analytics")
+
 # ================== VENDOR PAYMENT ENDPOINTS ==================
 
 @router.get("/vendor/earnings", response_model=List[PaymentOut])
@@ -347,6 +376,27 @@ def get_vendor_monthly_revenue(
         logger.error(f"Error retrieving monthly revenue: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve monthly revenue")
 
+@router.get("/vendor/stats")
+def get_vendor_payment_stats(
+    db: Session = Depends(get_db),
+    vendor=Depends(get_current_vendor)
+):
+    """Get payment statistics for the current vendor"""
+    try:
+        stats = payment_crud.get_payment_count_by_status(db, vendor_id=vendor.id)
+        recent_payments = payment_crud.get_recent_payments(db, vendor_id=vendor.id, limit=5)
+        
+        stats_dict = {stat.status.value: stat.count for stat in stats}
+        
+        return {
+            "total_payments": sum(stats_dict.values()),
+            "status_counts": stats_dict,
+            "recent_payments": recent_payments
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving vendor payment stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve payment statistics")
+
 # ================== PAYMENT DETAILS ==================
 
 @router.get("/{payment_id}", response_model=PaymentOut)
@@ -368,6 +418,31 @@ def get_payment_details(
         raise HTTPException(status_code=403, detail="Unauthorized access")
     
     logger.info(f"Payment retrieved successfully: ID {payment_id}")
+    return payment
+
+@router.get("/booking/{booking_id}", response_model=PaymentOut)
+def get_payment_by_booking(
+    booking_id: int, 
+    db: Session = Depends(get_db), 
+    user=Depends(get_current_user)
+):
+    """Get payment by booking ID"""
+    # Verify booking exists and user authorization
+    booking = booking_crud.get_booking_by_id(db, booking_id)
+    if not booking:
+        logger.error(f"Booking not found for ID {booking_id}")
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    if booking.user_id != user.id:
+        logger.warning(f"Unauthorized access to booking {booking_id} by user {user.id}")
+        raise HTTPException(status_code=403, detail="Unauthorized access")
+    
+    payment = payment_crud.get_payment_by_booking_id(db, booking_id)
+    if not payment:
+        logger.info(f"No payment found for booking ID {booking_id}")
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    logger.info(f"Payment retrieved successfully for booking ID {booking_id}")
     return payment
 
 @router.get("/razorpay/{razorpay_payment_id}/details")
@@ -427,10 +502,11 @@ async def razorpay_webhook(
     try:
         body = await request.body()
         
-        # Verify webhook signature
-        if not verify_webhook_signature(body, x_razorpay_signature):
-            logger.warning("Invalid webhook signature received")
-            raise HTTPException(status_code=400, detail="Invalid signature")
+        # Verify webhook signature if webhook secret is configured
+        if hasattr(settings, 'RAZORPAY_WEBHOOK_SECRET') and settings.RAZORPAY_WEBHOOK_SECRET:
+            if not verify_webhook_signature(body, x_razorpay_signature):
+                logger.warning("Invalid webhook signature received")
+                raise HTTPException(status_code=400, detail="Invalid signature")
         
         # Parse webhook data
         webhook_data = json.loads(body.decode('utf-8'))
@@ -517,84 +593,6 @@ def search_payments(
         logger.error(f"Error searching payments: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to search payments")
 
-# ================== REFUND HANDLING ==================
-
-@router.post("/refund/{payment_id}")
-def request_refund(
-    payment_id: int,
-    refund_amount: float = Query(..., gt=0, description="Refund amount"),
-    reason: str = Query(..., description="Reason for refund"),
-    db: Session = Depends(get_db),
-    user=Depends(get_current_user)
-):
-    """Request a refund for a successful payment"""
-    try:
-        # Get payment record
-        payment = payment_crud.get_payment_by_id(db, payment_id)
-        if not payment:
-            raise HTTPException(status_code=404, detail="Payment record not found")
-        
-        # Verify user authorization
-        booking = booking_crud.get_booking_by_id(db, payment.booking_id)
-        if booking.user_id != user.id:
-            raise HTTPException(status_code=403, detail="Unauthorized access")
-        
-        # Check if payment is successful
-        if payment.status != PaymentStatus.SUCCESS:
-            raise HTTPException(status_code=400, detail="Can only refund successful payments")
-        
-        # Validate refund amount
-        if refund_amount > payment.amount:
-            raise HTTPException(status_code=400, detail="Refund amount cannot exceed payment amount")
-        
-        # Create refund in Razorpay
-        if payment.razorpay_payment_id:
-            refund_data = {
-                "amount": int(refund_amount * 100),  # Convert to paise
-                "speed": "normal"
-            }
-            
-            refund = razorpay_client.payment.refund(payment.razorpay_payment_id, refund_data)
-            
-            # Update payment status to refunded if full refund
-            if refund_amount == payment.amount:
-                payment_crud.update_payment_status(db, payment, PaymentStatus.REFUNDED)
-            
-            logger.info(f"Refund created: Payment ID {payment.id}, Refund ID {refund['id']}, Amount {refund_amount}")
-            
-            return {
-                "status": "success",
-                "message": "Refund processed successfully",
-                "refund_id": refund["id"],
-                "amount": refund_amount,
-                "payment_id": payment.id
-            }
-        else:
-            raise HTTPException(status_code=400, detail="Cannot process refund: No Razorpay payment ID found")
-        
-    except razorpay.errors.BadRequestError as e:
-        logger.error(f"Razorpay refund error: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Razorpay refund error: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error creating refund: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process refund request")
-
-# ================== UTILITY FUNCTIONS ==================
-
-def verify_webhook_signature(body: bytes, signature: str) -> bool:
-    """Verify Razorpay webhook signature"""
-    try:
-        expected_signature = hmac.new(
-            settings.RAZORPAY_WEBHOOK_SECRET.encode('utf-8'),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-        
-        return hmac.compare_digest(expected_signature, signature)
-    except Exception as e:
-        logger.error(f"Error verifying webhook signature: {str(e)}")
-        return False
-
 # ================== FAILED PAYMENTS ==================
 
 @router.get("/failed/{payment_id}/details")
@@ -618,3 +616,23 @@ def get_failed_payment_details(
         raise HTTPException(status_code=400, detail="Payment is not in failed state or details not found")
     
     return failure_details
+
+# ================== UTILITY FUNCTIONS ==================
+
+def verify_webhook_signature(body: bytes, signature: str) -> bool:
+    """Verify Razorpay webhook signature"""
+    try:
+        if not hasattr(settings, 'RAZORPAY_WEBHOOK_SECRET') or not settings.RAZORPAY_WEBHOOK_SECRET:
+            logger.warning("Webhook secret not configured, skipping signature verification")
+            return True
+            
+        expected_signature = hmac.new(
+            settings.RAZORPAY_WEBHOOK_SECRET.encode('utf-8'),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        return hmac.compare_digest(expected_signature, signature)
+    except Exception as e:
+        logger.error(f"Error verifying webhook signature: {str(e)}")
+        return False
