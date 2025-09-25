@@ -104,12 +104,12 @@ from app.database import Base, engine
 from app.models import (
     user,
     service_provider_model,
-    category_model,
-    sub_category_model,
+    category,
+    sub_category,
     booking_model,
     payment_model,
-    user_address_model,
-    vendor_subcategory_charges_model
+    user_address,
+    vendor_subcategory_charge
 )
 
 from app.api.routes import (

@@ -1,3 +1,5 @@
+
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Float, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -11,7 +13,9 @@ class Booking(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     serviceprovider_id = Column(Integer, ForeignKey("service_providers.id"), nullable=False)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    
+    category_id = Column(Integer, ForeignKey("categories.id"))
+    subcategory_id = Column(Integer, ForeignKey("sub_categories.id"))
 
     # Booking details
     booking_date = Column(DateTime, nullable=False)
@@ -32,6 +36,13 @@ class Booking(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
+
+
+    # Relationships
+    user = relationship("User", backref="bookings")
+    service_provider = relationship("ServiceProvider", backref="bookings")
+    category = relationship("Category", backref="bookings")
+    subcategory = relationship("SubCategory", backref="bookings")
 
 
     # Relationships
