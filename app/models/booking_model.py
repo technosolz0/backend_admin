@@ -1,10 +1,9 @@
-
-
+# app/models/booking_model.py
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Float, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
-from app.schemas.booking_schema import BookingStatus  # Reuse Enum from schema
+from app.schemas.booking_schema import BookingStatus  # Enum for status
 
 
 class Booking(Base):
@@ -36,18 +35,9 @@ class Booking(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 
-
-
     # Relationships
     user = relationship("User", backref="bookings")
     service_provider = relationship("ServiceProvider", backref="bookings")
     category = relationship("Category", backref="bookings")
     subcategory = relationship("SubCategory", backref="bookings")
     payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")
-
-
-    # Relationships
-    user = relationship("User", backref="bookings")
-    service_provider = relationship("ServiceProvider", backref="bookings")
-    category = relationship("Category", backref="bookings")
-    subcategory = relationship("SubCategory", backref="bookings")

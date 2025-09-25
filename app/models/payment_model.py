@@ -5,13 +5,11 @@ from datetime import datetime
 from app.database import Base
 from app.schemas.payment_schema import PaymentStatus, PaymentMethod
 
+
 class Payment(Base):
     __tablename__ = "payments"
 
-    # Primary key MUST be defined correctly
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-
-    # Foreign key to bookings
     booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False)
 
     # Razorpay fields
