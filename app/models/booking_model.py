@@ -43,6 +43,7 @@ class Booking(Base):
     service_provider = relationship("ServiceProvider", backref="bookings")
     category = relationship("Category", backref="bookings")
     subcategory = relationship("SubCategory", backref="bookings")
+    payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")
 
 
     # Relationships
