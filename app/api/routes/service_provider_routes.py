@@ -99,7 +99,7 @@
 #         query = query.filter(SubCategory.category_id == category_id)
 #     return query.all()
 
-# @router.post("/login", response_model=dict)
+# @router.post("/login", response_model=VendorResponse)
 # def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db)):
 #     try:
 #         vendor, message = vendor_login(db, data.email, data.password)
@@ -126,7 +126,7 @@
 #         logger.error(f"Vendor login error: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @router.post("/register", response_model=dict)
+# @router.post("/register", response_model=VendorResponse)
 # def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
 #     """Register a new vendor and send OTP."""
 #     try:
@@ -138,7 +138,7 @@
 #         logger.error(f"Vendor registration error: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @router.post("/verify-otp", response_model=dict)
+# @router.post("/verify-otp", response_model=VendorResponse)
 # def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
 #     """Verify OTP and generate access token."""
 #     try:
@@ -169,7 +169,7 @@
 #         logger.error(f"OTP verification error: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @router.post("/send-otp", response_model=dict)
+# @router.post("/send-otp", response_model=VendorResponse)
 # def resend_otp_endpoint(data: OTPRequest, db: Session = Depends(get_db)):
 #     """Resend OTP to the vendor's email."""
 #     try:
@@ -181,7 +181,7 @@
 #         logger.error(f"OTP resend error: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @router.get("/me", response_model=dict)
+# @router.get("/me", response_model=VendorResponse)
 # def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor), db: Session = Depends(get_db)):
 #     """Retrieve the current vendor's details."""
 #     try:
@@ -201,7 +201,7 @@
 #         logger.error(f"Error retrieving vendor details: {str(e)}")
 #         raise HTTPException(status_code=500, detail="Internal server error")
 
-# @router.get("/{vendor_id}", response_model=dict)
+# @router.get("/{vendor_id}", response_model=VendorResponse)
 # def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
 #     """Retrieve vendor details by vendor_id."""
 #     try:
@@ -471,7 +471,7 @@ def get_subcategories(category_id: Optional[int] = None, db: Session = Depends(g
         query = query.filter(SubCategory.category_id == category_id)
     return query.all()
 
-@router.post("/login", response_model=dict)
+@router.post("/login", response_model=VendorResponse)
 def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db)):
     try:
         vendor, message = vendor_login(db, data.email, data.password)
@@ -487,7 +487,7 @@ def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db
         logger.error(f"Vendor login error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/register", response_model=dict)
+@router.post("/register", response_model=VendorResponse)
 def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
     """Register a new vendor and send OTP."""
     try:
@@ -499,7 +499,7 @@ def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
         logger.error(f"Vendor registration error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/verify-otp", response_model=dict)
+@router.post("/verify-otp", response_model=VendorResponse)
 def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
     """Verify OTP and generate access token."""
     try:
@@ -519,7 +519,7 @@ def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
         logger.error(f"OTP verification error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/send-otp", response_model=dict)
+@router.post("/send-otp", response_model=VendorResponse)
 def resend_otp_endpoint(data: OTPRequest, db: Session = Depends(get_db)):
     """Resend OTP to the vendor's email."""
     try:
@@ -531,7 +531,7 @@ def resend_otp_endpoint(data: OTPRequest, db: Session = Depends(get_db)):
         logger.error(f"OTP resend error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/me", response_model=dict)
+@router.get("/me", response_model=VendorResponse)
 def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor), db: Session = Depends(get_db)):
     """Retrieve the current vendor's details."""
     try:
@@ -541,7 +541,7 @@ def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor), db: Se
         logger.error(f"Error retrieving vendor details: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/{vendor_id}", response_model=dict)
+@router.get("/{vendor_id}", response_model=VendorResponse)
 def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
     """Retrieve vendor details by vendor_id."""
     try:
