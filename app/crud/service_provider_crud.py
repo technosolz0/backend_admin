@@ -751,7 +751,6 @@
 #         subcategory_charges=subcategory_charges
 #     )
 #     return vendor_response
-
 from datetime import datetime, timedelta
 from fastapi import HTTPException, UploadFile
 from passlib.context import CryptContext
@@ -922,7 +921,6 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
         existing.latitude = vendor.latitude
         existing.longitude = vendor.longitude
         existing.device_name = vendor.device_name
-        existing.profile_pic = vendor.profile_pic
         existing.otp = generate_otp()
         existing.otp_created_at = datetime.utcnow()
         existing.otp_last_sent_at = datetime.utcnow()
@@ -940,7 +938,6 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
         email=vendor.email,
         phone=vendor.phone,
         password=hashed_password,
-        profile_pic=vendor.profile_pic,
         terms_accepted=vendor.terms_accepted,
         identity_doc_type=vendor.identity_doc_type,
         identity_doc_number=vendor.identity_doc_number,

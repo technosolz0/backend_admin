@@ -20,7 +20,7 @@ class VendorCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
-    profile_pic: Optional[str] = None
+    # profile_pic: Optional[str] = None
 
 class AddressDetailsUpdate(BaseModel):
     address: str
