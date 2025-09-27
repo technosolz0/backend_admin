@@ -679,7 +679,6 @@ def update_work_status(
     except Exception as e:
         logger.error(f"Error updating work status for vendor {vendor_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
 @router.put("/admin/status", response_model=VendorResponse)
 def update_admin_status(
     vendor_id: int = Form(...),

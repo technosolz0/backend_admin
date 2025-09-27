@@ -831,7 +831,7 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         address_doc_url=vendor.address_doc_url,
         category_id=vendor.category_id,
         profile_pic=vendor.profile_pic,
-        status=vendor.admin_status,  # Map admin_status to status for frontend
+        status=vendor.status,  # Map admin_status to status for frontend
         admin_status=vendor.admin_status,
         work_status=vendor.work_status,
         subcategory_charges=subcategory_charges
@@ -1191,7 +1191,6 @@ def update_vendor_device(db: Session, vendor_id: int, update: VendorDeviceUpdate
     db.refresh(vendor)
     
     return build_vendor_response(db, vendor)
-
 def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
