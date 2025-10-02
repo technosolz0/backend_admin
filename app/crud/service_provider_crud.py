@@ -838,34 +838,73 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         subcategory_charges=subcategory_charges
     )
 
-def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[VendorResponse], int]:
-    """Retrieve all vendors with pagination."""
-    try:
-        offset = (page - 1) * limit
-        query = db.query(ServiceProvider).join(
-            Category, ServiceProvider.category_id == Category.id, isouter=True
-        ).join(
-            VendorSubcategoryCharge, ServiceProvider.id == VendorSubcategoryCharge.vendor_id, isouter=True
-        ).join(
-            SubCategory, VendorSubcategoryCharge.subcategory_id == SubCategory.id, isouter=True
-        )
+# def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[VendorResponse], int]:
+#     """Retrieve all vendors with pagination."""
+#     try:
+#         offset = (page - 1) * limit
+#         query = db.query(ServiceProvider).join(
+#             Category, ServiceProvider.category_id == Category.id, isouter=True
+#         ).join(
+#             VendorSubcategoryCharge, ServiceProvider.id == VendorSubcategoryCharge.vendor_id, isouter=True
+#         ).join(
+#             SubCategory, VendorSubcategoryCharge.subcategory_id == SubCategory.id, isouter=True
+#         )
         
-        total = query.distinct(ServiceProvider.id).count()
-        vendors = query.distinct(ServiceProvider.id).offset(offset).limit(limit).all()
+#         total = query.distinct(ServiceProvider.id).count()
+#         vendors = query.distinct(ServiceProvider.id).offset(offset).limit(limit).all()
+
+#         vendor_responses = []
+#         for vendor in vendors:
+#             vendor_response = build_vendor_response(db, vendor)
+#             vendor_responses.append(vendor_response)
+        
+#         logger.info(f"Retrieved {len(vendor_responses)} vendors for page {page}, limit {limit}")
+#         return vendor_responses, total
+#     except SQLAlchemyError as e:
+#         logger.error(f"Database error in get_all_vendors: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+#     except Exception as e:
+#         logger.error(f"Unexpected error in get_all_vendors: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+from sqlalchemy.orm import joinedload
+
+def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[VendorResponse], int]:
+    """Retrieve all vendors with pagination safely."""
+    try:
+        if page < 1: page = 1
+        if limit < 1: limit = 10
+
+        offset = (page - 1) * limit
+
+        # Use joinedload for safer eager loading
+        query = db.query(ServiceProvider).options(
+            joinedload(ServiceProvider.category),
+            joinedload(ServiceProvider.subcategory_charges).joinedload(VendorSubcategoryCharge.subcategory)
+        )
+
+        total = query.count()
+        vendors = query.offset(offset).limit(limit).all()
 
         vendor_responses = []
         for vendor in vendors:
-            vendor_response = build_vendor_response(db, vendor)
-            vendor_responses.append(vendor_response)
-        
+            try:
+                vendor_response = build_vendor_response(db, vendor)
+                vendor_responses.append(vendor_response)
+            except Exception as e:
+                logger.error(f"Failed to build vendor response for {vendor.id}: {str(e)}")
+                continue  # Skip vendor causing issues
+
         logger.info(f"Retrieved {len(vendor_responses)} vendors for page {page}, limit {limit}")
         return vendor_responses, total
+
     except SQLAlchemyError as e:
         logger.error(f"Database error in get_all_vendors: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error in get_all_vendors: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
 
 def delete_vendor(db: Session, vendor_id: int) -> None:
     """Delete a vendor by ID."""
