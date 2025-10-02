@@ -5,7 +5,7 @@ from app.models.service_provider_model import ServiceProvider
 from app.models.category import Category
 from app.models.sub_category import SubCategory
 from app.schemas.service_provider_schema import (
-    VendorCreate, VendorResponse, OTPRequest, OTPVerify,
+    PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest
 )
 from app.core.security import create_access_token, get_current_vendor
@@ -49,26 +49,21 @@ def transform_vendor_for_frontend(vendor: VendorResponse, db: Session) -> dict:
         "step": vendor.step  # Include step for frontend
     }
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=PaginatedVendorsResponse)
 def get_all_vendors_endpoint(
     db: Session = Depends(get_db),
     page: int = 1,
     limit: int = 10
 ):
-    """Retrieve all vendors with pagination, formatted for frontend."""
     try:
         vendors, total = get_all_vendors(db, page, limit)
-        # Transform response to match frontend ServiceProvider interface
-        transformed_vendors = [
-            transform_vendor_for_frontend(vendor, db)
-            for vendor in vendors
-        ]
-        logger.info(f"Returning {len(transformed_vendors)} vendors for page {page}, limit {limit}")
-        return {"vendors": transformed_vendors, "total": total}
+        return {"vendors": vendors, "total": total}
     except Exception as e:
         logger.error(f"Error in get_all_vendors: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
 
+    
 @router.delete("/{vendor_id}")
 def delete_vendor_endpoint(
     vendor_id: int,

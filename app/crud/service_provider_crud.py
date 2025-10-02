@@ -754,6 +754,7 @@
 from datetime import datetime, timedelta
 from fastapi import HTTPException, UploadFile
 from passlib.context import CryptContext
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.utils.otp_utils import generate_otp, send_email_otp
@@ -804,9 +805,61 @@ def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryC
         for charge in charges
     ]
 
+# def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorResponse:
+#     """Common function to build VendorResponse object"""
+#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
+#     return VendorResponse(
+#         id=vendor.id,
+#         full_name=vendor.full_name,
+#         email=vendor.email,
+#         phone=vendor.phone,
+#         address=vendor.address,
+#         state=vendor.state,
+#         city=vendor.city,
+#         pincode=vendor.pincode,
+#         account_holder_name=vendor.account_holder_name,
+#         account_number=vendor.account_number,
+#         ifsc_code=vendor.ifsc_code,
+#         upi_id=vendor.upi_id,
+#         identity_doc_type=vendor.identity_doc_type,
+#         identity_doc_number=vendor.identity_doc_number,
+#         identity_doc_url=vendor.identity_doc_url,
+#         bank_doc_type=vendor.bank_doc_type,
+#         bank_doc_number=vendor.bank_doc_number,
+#         bank_doc_url=vendor.bank_doc_url,
+#         address_doc_type=vendor.address_doc_type,
+#         address_doc_number=vendor.address_doc_number,
+#         address_doc_url=vendor.address_doc_url,
+#         category_id=vendor.category_id,
+#         profile_pic=vendor.profile_pic,
+#         step=vendor.step,  # Include step
+#         status=vendor.status,  # Map admin_status to status for frontend
+#         admin_status=vendor.admin_status,
+#         work_status=vendor.work_status,
+#         subcategory_charges=subcategory_charges
+#     )
+
 def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorResponse:
-    """Common function to build VendorResponse object"""
-    subcategory_charges = attach_subcategory_charges(db, vendor.id)
+    # Get Category Name
+    category_name = None
+    if vendor.category_id:
+        category = db.query(Category).filter(Category.id == vendor.category_id).first()
+        category_name = category.name if category else None
+
+    # Get SubCategory Names + Charges
+    subcategory_charges = []
+    charges = db.query(VendorSubcategoryCharge).filter(
+        VendorSubcategoryCharge.vendor_id == vendor.id
+    ).all()
+
+    for charge in charges:
+        subcat = db.query(SubCategory).filter(SubCategory.id == charge.subcategory_id).first()
+        subcategory_charges.append({
+            "subcategory_id": charge.subcategory_id,
+            "subcategory_name": subcat.name if subcat else None,
+            "service_charge": charge.service_charge,
+        })
+
     return VendorResponse(
         id=vendor.id,
         full_name=vendor.full_name,
@@ -830,57 +883,28 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         address_doc_number=vendor.address_doc_number,
         address_doc_url=vendor.address_doc_url,
         category_id=vendor.category_id,
+        category_name=category_name,  # 👈 Name instead of just ID
         profile_pic=vendor.profile_pic,
-        step=vendor.step,  # Include step
-        status=vendor.status,  # Map admin_status to status for frontend
+        step=vendor.step,
+        status=vendor.status,
         admin_status=vendor.admin_status,
         work_status=vendor.work_status,
         subcategory_charges=subcategory_charges
     )
 
-# def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[VendorResponse], int]:
-#     """Retrieve all vendors with pagination."""
-#     try:
-#         offset = (page - 1) * limit
-#         query = db.query(ServiceProvider).join(
-#             Category, ServiceProvider.category_id == Category.id, isouter=True
-#         ).join(
-#             VendorSubcategoryCharge, ServiceProvider.id == VendorSubcategoryCharge.vendor_id, isouter=True
-#         ).join(
-#             SubCategory, VendorSubcategoryCharge.subcategory_id == SubCategory.id, isouter=True
-#         )
-        
-#         total = query.distinct(ServiceProvider.id).count()
-#         vendors = query.distinct(ServiceProvider.id).offset(offset).limit(limit).all()
 
-#         vendor_responses = []
-#         for vendor in vendors:
-#             vendor_response = build_vendor_response(db, vendor)
-#             vendor_responses.append(vendor_response)
-        
-#         logger.info(f"Retrieved {len(vendor_responses)} vendors for page {page}, limit {limit}")
-#         return vendor_responses, total
-#     except SQLAlchemyError as e:
-#         logger.error(f"Database error in get_all_vendors: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-#     except Exception as e:
-#         logger.error(f"Unexpected error in get_all_vendors: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-from sqlalchemy.orm import joinedload
-
-def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[VendorResponse], int]:
-    """Retrieve all vendors with pagination safely."""
+def get_all_vendors(db: Session, page: int = 1, limit: int = 10):
+    """Retrieve all vendors with pagination and category/subcategory names efficiently."""
     try:
-        if page < 1: page = 1
-        if limit < 1: limit = 10
-
         offset = (page - 1) * limit
 
-        # Use joinedload for safer eager loading
-        query = db.query(ServiceProvider).options(
-            joinedload(ServiceProvider.category),
-            joinedload(ServiceProvider.subcategory_charges).joinedload(VendorSubcategoryCharge.subcategory)
+        # Eager load category and subcategory charges with subcategory
+        query = (
+            db.query(ServiceProvider)
+            .options(
+                joinedload(ServiceProvider.category),  # load Category
+                joinedload(ServiceProvider.subcategory_charges).joinedload(VendorSubcategoryCharge.subcategory)  # load SubCategory
+            )
         )
 
         total = query.count()
@@ -888,22 +912,59 @@ def get_all_vendors(db: Session, page: int = 1, limit: int = 10) -> Tuple[List[V
 
         vendor_responses = []
         for vendor in vendors:
-            try:
-                vendor_response = build_vendor_response(db, vendor)
-                vendor_responses.append(vendor_response)
-            except Exception as e:
-                logger.error(f"Failed to build vendor response for {vendor.id}: {str(e)}")
-                continue  # Skip vendor causing issues
+            # Category Name
+            category_name = vendor.category.name if vendor.category else None
 
-        logger.info(f"Retrieved {len(vendor_responses)} vendors for page {page}, limit {limit}")
+            # Subcategory names
+            subcategory_charges = []
+            for charge in vendor.subcategory_charges:
+                subcategory_name = charge.subcategory.name if charge.subcategory else None
+                subcategory_charges.append({
+                    "subcategory_id": charge.subcategory_id,
+                    "subcategory_name": subcategory_name,
+                    "service_charge": charge.service_charge
+                })
+
+            vendor_responses.append(
+                VendorResponse(
+                    id=vendor.id,
+                    full_name=vendor.full_name,
+                    email=vendor.email,
+                    phone=vendor.phone,
+                    address=vendor.address,
+                    state=vendor.state,
+                    city=vendor.city,
+                    pincode=vendor.pincode,
+                    account_holder_name=vendor.account_holder_name,
+                    account_number=vendor.account_number,
+                    ifsc_code=vendor.ifsc_code,
+                    upi_id=vendor.upi_id,
+                    identity_doc_type=vendor.identity_doc_type,
+                    identity_doc_number=vendor.identity_doc_number,
+                    identity_doc_url=vendor.identity_doc_url,
+                    bank_doc_type=vendor.bank_doc_type,
+                    bank_doc_number=vendor.bank_doc_number,
+                    bank_doc_url=vendor.bank_doc_url,
+                    address_doc_type=vendor.address_doc_type,
+                    address_doc_number=vendor.address_doc_number,
+                    address_doc_url=vendor.address_doc_url,
+                    category_id=vendor.category_id,
+                    category_name=category_name,
+                    profile_pic=vendor.profile_pic,
+                    step=vendor.step,
+                    status=vendor.status,
+                    admin_status=vendor.admin_status,
+                    work_status=vendor.work_status,
+                    subcategory_charges=subcategory_charges
+                )
+            )
+
         return vendor_responses, total
 
-    except SQLAlchemyError as e:
-        logger.error(f"Database error in get_all_vendors: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error in get_all_vendors: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        logger.error(f"Error fetching vendors: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 
 def delete_vendor(db: Session, vendor_id: int) -> None:
