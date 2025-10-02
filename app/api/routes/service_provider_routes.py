@@ -1,6 +1,3 @@
-
-
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -48,7 +45,8 @@ def transform_vendor_for_frontend(vendor: VendorResponse, db: Session) -> dict:
         "serviceId": str(vendor.subcategory_charges[0].subcategory_id) if vendor.subcategory_charges else "",
         "serviceName": db.query(SubCategory).filter(SubCategory.id == vendor.subcategory_charges[0].subcategory_id).first().name if vendor.subcategory_charges else "N/A",
         "contactInfo": vendor.email or vendor.phone or "N/A",
-        "status": vendor.admin_status.capitalize()
+        "status": vendor.admin_status.capitalize(),
+        "step": vendor.step  # Include step for frontend
     }
 
 @router.get("/", response_model=List[dict])
@@ -111,7 +109,8 @@ def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db
         return {
             "access_token": token,
             "token_type": "bearer",
-            "vendor": vendor  # Full VendorResponse object
+            "vendor": build_vendor_response(db, vendor),  # Full VendorResponse with step
+            "message": message  # Ensure message included
         }
     except HTTPException as e:
         raise e
@@ -124,7 +123,7 @@ def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
     """Register a new vendor and send OTP."""
     try:
         db_vendor = create_vendor(db, vendor)
-        return {"message": "OTP sent", "vendor_id": db_vendor.id}
+        return {"message": "OTP sent", "vendor_id": db_vendor.id, "step": db_vendor.step}  # Include initial step
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -142,8 +141,9 @@ def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
         return {
             "message": message,
             "vendor_id": vendor.id,
+            "step": vendor.step,  # Include step after OTP
             "access_token": access_token,
-            "vendor": vendor  # Full VendorResponse object
+            "vendor": vendor  # Full VendorResponse object with step
         }
     except HTTPException as e:
         raise e
@@ -168,7 +168,7 @@ def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor), db: Se
     """Retrieve the current vendor's details."""
     try:
         vendor_response = build_vendor_response(db, current_vendor)
-        return vendor_response  # Full VendorResponse object
+        return vendor_response  # Full VendorResponse object with step
     except Exception as e:
         logger.error(f"Error retrieving vendor details: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -181,7 +181,7 @@ def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found")
         vendor_response = build_vendor_response(db, vendor)
-        return vendor_response  # Full VendorResponse object
+        return vendor_response  # Full VendorResponse object with step
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -311,6 +311,7 @@ def update_work_status(
     except Exception as e:
         logger.error(f"Error updating work status for vendor {vendor_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.put("/admin/status", response_model=VendorResponse)
 def update_admin_status(
     vendor_id: int = Form(...),

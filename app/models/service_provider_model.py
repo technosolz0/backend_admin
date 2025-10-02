@@ -1,4 +1,3 @@
-# app/models/service_provider_model.py
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Enum as SAEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -38,9 +37,10 @@ class ServiceProvider(Base):
     longitude = Column(Float)
     device_name = Column(String)
     last_device_update = Column(DateTime)
+    step = Column(Integer, default=0, nullable=False)  # Registration step (0-5)
 
     status = Column(SAEnum('pending', 'approved', 'rejected', 'inactive', name='vendor_status'), default='approved')
-    admin_status = Column(SAEnum('active', 'inactive', name='admin_status'), default='active')
+    admin_status = Column(SAEnum('active', 'inactive', name='admin_status'), default='inactive')  # Default inactive
     work_status = Column(SAEnum('work_on', 'work_off', name='work_status'), default='work_on')
 
     otp = Column(String)

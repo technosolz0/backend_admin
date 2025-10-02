@@ -831,6 +831,7 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         address_doc_url=vendor.address_doc_url,
         category_id=vendor.category_id,
         profile_pic=vendor.profile_pic,
+        step=vendor.step,  # Include step
         status=vendor.status,  # Map admin_status to status for frontend
         admin_status=vendor.admin_status,
         work_status=vendor.work_status,
@@ -921,6 +922,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
         existing.latitude = vendor.latitude
         existing.longitude = vendor.longitude
         existing.device_name = vendor.device_name
+        existing.step = 0  # Initial step 0
         existing.otp = generate_otp()
         existing.otp_created_at = datetime.utcnow()
         existing.otp_last_sent_at = datetime.utcnow()
@@ -945,6 +947,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
         latitude=vendor.latitude,
         longitude=vendor.longitude,
         device_name=vendor.device_name,
+        step=0,  # Initial step 0
         otp=otp,
         otp_created_at=now,
         otp_last_sent_at=now,
@@ -981,6 +984,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse
     vendor.otp_verified = True
     vendor.otp_attempts = 0
     vendor.status = 'pending'
+    vendor.step = 1  # Step 1 after OTP verify (address)
     vendor.last_login = datetime.utcnow()
     db.commit()
     db.refresh(vendor)
@@ -1018,6 +1022,10 @@ def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpd
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
     
+    # Step update: Only if initial registration (step == 0)
+    if vendor.step == 0:
+        vendor.step = 2  # Address complete -> step 2 (bank)
+    
     vendor.last_device_update = datetime.utcnow()
     db.commit()
     db.refresh(vendor)
@@ -1034,6 +1042,10 @@ def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -
     
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
+    
+    # Step update: Only if initial (step == 1)
+    if vendor.step == 1:
+        vendor.step = 3  # Bank complete -> step 3 (work)
     
     vendor.last_device_update = datetime.utcnow()
     db.commit()
@@ -1095,6 +1107,10 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
             logger.debug(f"Inserting charge: vendor_id={vendor_id}, subcategory_id={charge.subcategory_id}, service_charge={charge.service_charge}")
             vendor.subcategory_charges.append(new_charge)
 
+        # Step update: Only if initial (step == 2)
+        if vendor.step == 2:
+            vendor.step = 4  # Work complete -> step 4 (document)
+        
         vendor.status = 'approved'
         vendor.last_device_update = datetime.utcnow()
         logger.debug(f"Committing changes for vendor_id: {vendor_id}")
@@ -1156,6 +1172,10 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
         vendor.bank_doc_url = save_file(bank_doc, "documents", "bank")
         vendor.address_doc_url = save_file(address_doc, "documents", "address")
         
+        # Step update: Only if initial (step == 3)
+        if vendor.step == 3:
+            vendor.step = 5  # Documents complete -> step 5 (complete)
+        
         vendor.last_device_update = datetime.utcnow()
         db.commit()
         db.refresh(vendor)
@@ -1191,6 +1211,7 @@ def update_vendor_device(db: Session, vendor_id: int, update: VendorDeviceUpdate
     db.refresh(vendor)
     
     return build_vendor_response(db, vendor)
+
 def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:

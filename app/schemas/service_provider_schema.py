@@ -20,7 +20,7 @@ class VendorCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
-    # profile_pic: Optional[str] = None
+    # No step here - set in CRUD (initial 0)
 
 class AddressDetailsUpdate(BaseModel):
     address: str
@@ -29,6 +29,7 @@ class AddressDetailsUpdate(BaseModel):
     pincode: str
     address_doc_type: str
     address_doc_number: str
+    # No step - CRUD handles internally
 
 class BankDetailsUpdate(BaseModel):
     account_holder_name: str
@@ -37,16 +38,19 @@ class BankDetailsUpdate(BaseModel):
     upi_id: str
     bank_doc_type: str
     bank_doc_number: str
+    # No step - CRUD handles internally
 
 class WorkDetailsUpdate(BaseModel):
     category_id: int
     subcategory_charges: List[SubCategoryCharge]
+    # No step - CRUD handles internally
 
 class VendorDeviceUpdate(BaseModel):
     fcm_token: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
+    # No step - CRUD handles internally
 
 class VendorResponse(BaseModel):
     id: int
@@ -72,6 +76,7 @@ class VendorResponse(BaseModel):
     address_doc_url: Optional[str] = None
     category_id: Optional[int] = None
     profile_pic: Optional[str] = None
+    step: Optional[int] = None  # Include step (0-5)
     status: str = Field(..., pattern="^(pending|approved|rejected|inactive)$")
     admin_status: str = Field(..., pattern="^(active|inactive)$")
     work_status: str = Field(..., pattern="^(work_on|work_off)$")
