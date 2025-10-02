@@ -120,7 +120,8 @@ from app.api.routes import (
     sub_category_routes,
     booking_routes,
     payment_route,
-    user_address_router
+    user_address_router,
+    delete_request_routes
 )
 
 # -------------------------
@@ -191,6 +192,7 @@ app.include_router(service_provider_routes.router, prefix="/api")
 app.include_router(booking_routes.router, prefix="/api")
 app.include_router(payment_route.router, prefix="/api")
 app.include_router(user_address_router.router, prefix="/api")
+app.include_router(delete_request_routes.router, prefix="/api")
 
 # -------------------------
 # Custom OpenAPI with JWT
@@ -199,9 +201,9 @@ def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(
-        title="Servex API",
+        title="Serwex API",
         version="1.0.0",
-        description="Servex Backend with JWT Authentication",
+        description="Serwex Backend with JWT Authentication",
         routes=app.routes,
     )
     openapi_schema["components"]["securitySchemes"] = {

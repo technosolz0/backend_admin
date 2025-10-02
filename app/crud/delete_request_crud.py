@@ -33,8 +33,28 @@ def create_delete_request(db: Session, req: DeleteRequestCreate):
     db.refresh(new_req)
     return new_req
 
-def get_delete_requests(db: Session, skip: int = 0, limit: int = 50):
-    return db.query(DeleteRequest).order_by(DeleteRequest.request_date.desc()).offset(skip).limit(limit).all()
+# def get_delete_requests(db: Session, skip: int = 0, limit: int = 50):
+#     return db.query(DeleteRequest).order_by(DeleteRequest.request_date.desc()).offset(skip).limit(limit).all()
+def get_delete_requests(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    name: str = None,
+    role: str = None,
+    phone: str = None,
+):
+    query = db.query(DeleteRequest)
+
+    if name:
+        query = query.filter(DeleteRequest.name.ilike(f"%{name}%"))
+    if role:
+        query = query.filter(DeleteRequest.role == role)
+    if phone:
+        query = query.filter(DeleteRequest.phone.ilike(f"%{phone}%"))
+
+    total = query.count()
+    results = query.order_by(DeleteRequest.request_date.desc()).offset(skip).limit(limit).all()
+    return {"data": results, "total": total}
 
 def delete_request_by_id(db: Session, request_id: int):
     req = db.query(DeleteRequest).filter(DeleteRequest.id == request_id).first()
