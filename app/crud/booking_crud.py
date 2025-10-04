@@ -150,8 +150,24 @@ def create_booking(db: Session, booking_data: BookingCreate):
     """Create a new booking"""
     booking = Booking(**booking_data.dict())
     booking.created_at = datetime.utcnow()
-    booking.updated_at = datetime.utcnow()
+    # No updated_at in model, but if you add it later, set here
     db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+# Update other functions if needed (e.g., add address to update_booking)
+def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate):
+    """Update booking details"""
+    booking = get_booking_by_id(db, booking_id)
+    if not booking:
+        return None
+    
+    update_data = booking_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(booking, field, value)
+    
+    booking.status = booking_update.status if hasattr(booking_update, 'status') else booking.status  # If adding status update
     db.commit()
     db.refresh(booking)
     return booking
@@ -223,20 +239,20 @@ def update_booking_status(db: Session, booking: Booking, status: BookingStatus, 
     db.refresh(booking)
     return booking
 
-def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate):
-    """Update booking details"""
-    booking = get_booking_by_id(db, booking_id)
-    if not booking:
-        return None
+# def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate):
+#     """Update booking details"""
+#     booking = get_booking_by_id(db, booking_id)
+#     if not booking:
+#         return None
     
-    update_data = booking_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(booking, field, value)
+#     update_data = booking_update.dict(exclude_unset=True)
+#     for field, value in update_data.items():
+#         setattr(booking, field, value)
     
-    booking.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(booking)
-    return booking
+#     booking.updated_at = datetime.utcnow()
+#     db.commit()
+#     db.refresh(booking)
+#     return booking
 
 def delete_booking(db: Session, booking_id: int) -> bool:
     """Delete a booking"""
