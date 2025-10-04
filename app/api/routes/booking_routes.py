@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.security import get_db, get_current_user, get_current_vendor
 from app.schemas.booking_schema import BookingCreate, BookingOut, BookingStatusUpdate
 from app.schemas.payment_schema import PaymentCreate, PaymentOut
-from app.crud import booking_crud, payment_crud, category_crud, subcategory_crud
+from app.crud import booking_crud, payment_crud, category, subcategory
 from app.models.booking_model import BookingStatus
 from datetime import datetime, date
 from typing import List, Optional
@@ -16,8 +16,8 @@ router = APIRouter(prefix="/bookings", tags=["Booking"])
 
 # ✅ Helper to enrich booking with category/subcategory names
 def enrich_booking(db: Session, booking) -> BookingOut:
-    category = category_crud.get_category_by_id(db, booking.category_id)
-    subcategory = subcategory_crud.get_subcategory_by_id(db, booking.subcategory_id)
+    category = category.get_category_by_id(db, booking.category_id)
+    subcategory = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
     return BookingOut.from_orm(booking).copy(update={
         "category_name": category.name if category else None,
         "subcategory_name": subcategory.name if subcategory else None,
