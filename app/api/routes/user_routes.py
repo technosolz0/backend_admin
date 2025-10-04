@@ -27,17 +27,22 @@ def verify_login_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Invalid OTP")
     if result == "expired":
         raise HTTPException(status_code=400, detail="OTP expired")
-    access_token = create_access_token(data={"sub": result.email})
+
+    user_obj = result["user"]
+    access_token = create_access_token(data={"sub": user_obj.email})
 
     return {
         "message": "Login successful",
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
-            "id": result.id,
-            "name": result.name,
-            "email": result.email,
-            "mobile": result.mobile
+            "id": user_obj.id,
+            "name": user_obj.name,
+            "email": user_obj.email,
+            "mobile": user_obj.mobile,
+            "last_login_at": user_obj.last_login_at,
+            "addresses": result["addresses"],
+            "default_address": result["default_address"]
         }
     }
 

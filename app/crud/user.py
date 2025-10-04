@@ -131,16 +131,42 @@ def verify_login_otp(db, email: str, otp: str):
     if datetime.utcnow() > expiry_time:
         return "expired"
 
-    # ✅ clear OTP
+    # clear OTP
     user.otp = None
     user.otp_created_at = None
 
-    # ✅ update last login time
+    # update last login time
     user.last_login_at = datetime.utcnow()
 
     db.commit()
     db.refresh(user)
-    return user
+
+    # ✅ Fetch addresses for this user only
+    addresses = [
+        {
+            "id": addr.id,
+            "name": addr.name,
+            "phone": addr.phone,
+            "address": addr.address,
+            "landmark": addr.landmark,
+            "city": addr.city,
+            "state": addr.state,
+            "pincode": addr.pincode,
+            "country": addr.country,
+            "address_type": addr.address_type,
+            "is_default": addr.is_default
+        }
+        for addr in user.addresses
+    ]
+
+    # ✅ Identify default address
+    default_address = next((addr for addr in addresses if addr["is_default"]), None)
+
+    return {
+        "user": user,
+        "addresses": addresses,
+        "default_address": default_address
+    }
 
 
 
