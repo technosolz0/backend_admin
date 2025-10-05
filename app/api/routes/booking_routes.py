@@ -25,6 +25,7 @@ def enrich_booking(db: Session, booking) -> BookingOut:
         "subcategory_name": subcat.name if subcat else None,
     })
 
+
 # ------------------- Create Booking -------------------
 @router.post("/", response_model=BookingOut)
 def create_booking(
