@@ -41,6 +41,9 @@ class BookingOut(BaseModel):
     created_at: datetime
     otp: Optional[str] = None
     otp_created_at: Optional[datetime] = None
+    model_config = {
+        "from_attributes": True
+    }
 
     class Config:
         from_attributes = True
