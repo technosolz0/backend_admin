@@ -33,8 +33,9 @@ class BookingOut(BaseModel):
     serviceprovider_id: int
     category_id: int
     subcategory_id: int
-    category_name: Optional[str]   # ✅ extra field
-    subcategory_name: Optional[str]  # ✅ extra field
+    category_name: Optional[str] = None
+    subcategory_name: Optional[str] = None
+
     scheduled_time: datetime
     address: str
     status: BookingStatus
