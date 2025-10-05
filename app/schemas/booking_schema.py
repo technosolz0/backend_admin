@@ -44,10 +44,6 @@ class BookingOut(BaseModel):
     model_config = {
         "from_attributes": True
     }
-
-    class Config:
-        from_attributes = True
-
 class BookingSearchResponse(BaseModel):
     bookings: List[BookingOut]
     total: int
