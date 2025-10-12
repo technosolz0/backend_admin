@@ -307,10 +307,25 @@ def update_work_status(
         logger.error(f"Error updating work status for vendor {vendor_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# @router.put("/admin/status", response_model=VendorResponse)
+# def update_admin_status(
+#     vendor_id: int = Form(...),
+#     admin_status: str = Form(..., pattern="^(active|inactive)$"),
+#     db: Session = Depends(get_db)
+# ):
+#     """Update vendor admin status."""
+#     try:
+#         vendor = change_vendor_admin_status(db, vendor_id, admin_status)
+#         return vendor
+#     except HTTPException as e:
+#         raise e
+#     except Exception as e:
+#         logger.error(f"Error updating admin status for vendor {vendor_id}: {str(e)}")
+#         raise HTTPException(status_code=500, detail="Internal server error")
 @router.put("/admin/status", response_model=VendorResponse)
 def update_admin_status(
     vendor_id: int = Form(...),
-    admin_status: str = Form(..., pattern="^(active|inactive)$"),
+    admin_status: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """Update vendor admin status."""
@@ -320,5 +335,7 @@ def update_admin_status(
     except HTTPException as e:
         raise e
     except Exception as e:
+        import traceback
         logger.error(f"Error updating admin status for vendor {vendor_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
