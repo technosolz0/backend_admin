@@ -338,4 +338,4 @@ def update_admin_status(
         import traceback
         logger.error(f"Error updating admin status for vendor {vendor_id}: {str(e)}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

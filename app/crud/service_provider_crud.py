@@ -1324,11 +1324,15 @@ def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> Vend
     db.commit()
     db.refresh(vendor)
     if vendor.fcm_token:
-        send_push_notification(
-            token=vendor.fcm_token,
-            title="Status Update",
-            body=f"Your account status has been updated to {status}"
-        )
+        try:
+            send_push_notification(
+                token=vendor.fcm_token,
+                title="Status Update",
+                body=f"Your account status has been updated to {status}"
+            )
+        except Exception as e:
+            logger.warning(f"FCM notification failed for vendor {vendor_id}: {str(e)}")
+
 
     return build_vendor_response(db, vendor)
 
