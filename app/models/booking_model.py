@@ -71,7 +71,9 @@ class Booking(Base):
     otp_created_at = Column(DateTime, nullable=True)
 
     # Relationships (keep as-is)
-    user = relationship("User", backref="bookings")
+    # user = relationship("User", backref="bookings")
+    user = relationship("User", back_populates="bookings")
+
     service_provider = relationship("ServiceProvider", backref="bookings")
     category = relationship("Category", backref="bookings")
     subcategory = relationship("SubCategory", backref="bookings")
