@@ -57,18 +57,35 @@ def get_all_bookings(
     return [enrich_booking(db, b) for b in bookings]
 
 # ------------------- Get Single Booking -------------------
+# @router.get("/{booking_id}", response_model=BookingOut)
+# def get_booking(
+#     booking_id: int,
+#     db: Session = Depends(get_db),
+#     user=Depends(get_current_user)
+# ):
+#     booking = booking_crud.get_booking_by_id(db, booking_id)
+#     if not booking:
+#         raise HTTPException(status_code=404, detail="Booking not found")
+#     if booking.user_id != user.id:
+#         raise HTTPException(status_code=403, detail="Unauthorized access")
+#     return enrich_booking(db, booking)
 @router.get("/{booking_id}", response_model=BookingOut)
 def get_booking(
     booking_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    vendor=Depends(get_current_vendor),
 ):
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if booking.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Unauthorized access")
-    return enrich_booking(db, booking)
+
+    # ✅ Allow either user or vendor to access their booking
+    if (user and booking.user_id == user.id) or (vendor and booking.serviceprovider_id == vendor.id):
+        return enrich_booking(db, booking)
+
+    raise HTTPException(status_code=403, detail="Unauthorized access")
+
 
 # ------------------- Update Booking Status (Vendor) -------------------
 @router.patch("/{booking_id}/status", response_model=BookingOut)
