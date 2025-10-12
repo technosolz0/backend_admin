@@ -5,8 +5,7 @@ from app.models.booking_model import Booking, BookingStatus
 from app.schemas.booking_schema import BookingCreate, BookingUpdate
 from typing import List, Optional
 import logging
-
-from servex_admin.backend_admin.app.utils.fcm import send_push_notification
+from app.utils.fcm import send_push_notification
 
 logger = logging.getLogger(__name__)
 
