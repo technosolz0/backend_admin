@@ -6,6 +6,8 @@ from app.schemas.booking_schema import BookingCreate, BookingUpdate
 from typing import List, Optional
 import logging
 
+from servex_admin.backend_admin.app.utils.fcm import send_push_notification
+
 logger = logging.getLogger(__name__)
 
 def create_booking(db: Session, booking_data: BookingCreate):
@@ -15,23 +17,76 @@ def create_booking(db: Session, booking_data: BookingCreate):
     db.add(booking)
     db.commit()
     db.refresh(booking)
+    # Send notification to vendor
+    vendor_fcm_token = booking.service_provider.fcm_token if booking.service_provider else None
+    if vendor_fcm_token:
+        send_push_notification(
+            token=vendor_fcm_token,
+            title="New Booking Received",
+            body=f"New booking #{booking.id} for {booking.subcategory.name} has been scheduled.",
+            data={"notification_type": "booking_created", "booking_id": str(booking.id)}
+        )
+        logger.info(f"Notification sent to vendor for booking {booking.id}")
     return booking
 
 
-def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate):
-    """Update booking details"""
-    booking = get_booking_by_id(db, booking_id)
-    if not booking:
-        return None
+# def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate):
+#     """Update booking details"""
+#     booking = get_booking_by_id(db, booking_id)
+#     if not booking:
+#         return None
     
-    update_data = booking_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(booking, field, value)
+#     update_data = booking_update.dict(exclude_unset=True)
+#     for field, value in update_data.items():
+#         setattr(booking, field, value)
     
+#     db.commit()
+#     db.refresh(booking)
+    
+#     return booking
+
+def update_booking_status(db: Session, booking: Booking, status: BookingStatus, otp: Optional[str] = None):
+    """Update booking status with validation and send notification to user"""
+    valid_transitions = {
+        BookingStatus.pending: [BookingStatus.accepted, BookingStatus.cancelled],
+        BookingStatus.accepted: [BookingStatus.completed, BookingStatus.cancelled],
+        BookingStatus.completed: [],
+        BookingStatus.cancelled: []
+    }
+
+    if status not in valid_transitions.get(booking.status, []):
+        raise ValueError(f"Invalid status transition from {booking.status} to {status}")
+
+    if status == BookingStatus.completed and otp and booking.otp != otp:
+        raise ValueError("Invalid OTP provided")
+
+    old_status = booking.status
+    booking.status = status
+    booking.updated_at = datetime.utcnow()
+    if status == BookingStatus.completed:
+        booking.completed_at = datetime.utcnow()
+
     db.commit()
     db.refresh(booking)
+    
+    # Send notification to user on status change
+    user_fcm_token = booking.user.fcm_token if booking.user else None  # Assume User has fcm_token
+    if user_fcm_token and old_status != status:
+        status_messages = {
+            BookingStatus.accepted: "Booking Accepted",
+            BookingStatus.completed: "Booking Completed",
+            BookingStatus.cancelled: "Booking Cancelled"
+        }
+        message = status_messages.get(status, f"Booking Status Updated to {status.value}")
+        send_push_notification(
+            token=user_fcm_token,
+            title=message,
+            body=f"Your booking #{booking.id} has been {status.value}.",
+            data={"notification_type": "status_updated", "booking_id": str(booking.id), "status": status.value}
+        )
+        logger.info(f"Status notification sent to user for booking {booking.id}")
+    
     return booking
-
 
 def get_booking_by_id(db: Session, booking_id: int) -> Optional[Booking]:
     return db.query(Booking).filter(Booking.id == booking_id).first()

@@ -33,7 +33,8 @@ class User(Base):
     otp = Column(String, nullable=True)
     otp_created_at = Column(DateTime, nullable=True)
     is_verified = Column(Boolean, default=False)
-
+    fcm_token = Column(String, nullable=True)
     last_login_at = Column(DateTime, nullable=True)
     login_logs = relationship("LoginLog", back_populates="user", lazy='joined')
     addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
+    bookings = relationship("Booking", back_populates="user")

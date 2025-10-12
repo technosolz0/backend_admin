@@ -237,3 +237,36 @@ def cancel_booking(
         return {"message": "Booking cancelled successfully"}
     else:
         raise HTTPException(status_code=400, detail=f"Cannot cancel booking with status {booking.status}")
+
+
+
+# app/routers/booking_router.py - Add endpoint for send-completion-otp
+# Add this to the existing router
+
+@router.post("/{booking_id}/send-completion-otp")
+def send_completion_otp(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    vendor=Depends(get_current_vendor)
+):
+    """Send OTP to user for booking completion"""
+    booking = booking_crud.get_booking_by_id(db, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.serviceprovider_id != vendor.id:
+        raise HTTPException(status_code=403, detail="Unauthorized provider")
+    if booking.status != BookingStatus.accepted:
+        raise HTTPException(status_code=400, detail="Booking must be accepted to send completion OTP")
+
+    # Generate and send OTP to user email
+    from app.utils.otp_utils import generate_otp, send_email_otp
+    otp = generate_otp()
+    booking.otp = otp
+    booking.otp_created_at = datetime.utcnow()
+    db.commit()
+    db.refresh(booking)
+
+    send_email_otp(booking.user.email, otp)
+    logger.info(f"Completion OTP sent to user for booking {booking_id}")
+
+    return {"message": "OTP sent to user email"}
