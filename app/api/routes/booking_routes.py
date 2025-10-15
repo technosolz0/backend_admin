@@ -325,7 +325,7 @@ class NotificationType(str, Enum):
     payment_created = "payment_created"
 
 # ------------------- Notification Utility -------------------
-from app.utils.notification_utils import send_notification
+from app.utils.fcm import send_notification
 
 def send_booking_notification(db: Session, booking, notification_type: NotificationType, recipient: str, recipient_id: int, fcm_token: Optional[str] = None):
     """Helper function to send notifications for booking actions."""
