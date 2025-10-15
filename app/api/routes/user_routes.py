@@ -373,113 +373,49 @@ router = APIRouter(prefix="/users", tags=["User Management & Auth"])
 @router.post("/register-otp", response_model=dict)
 def register_user_with_otp(user: user_schema.UserCreate, db: Session = Depends(get_db)):
     """Register a new user and send OTP for email verification."""
-    try:
-        created_user, otp = crud_user.create_user_with_otp(db, user)
-        logger.info(f"User registration initiated for email: {user.email}")
-        return {"message": "OTP sent successfully for email verification."}
-    except ValueError as e:
-        logger.error(f"Registration failed: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+    result = crud_user.create_user_with_otp(db, user)
+    if not result["success"]:
+        logger.error(f"Registration failed: {result['message']}")
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    logger.info(f"User registration OTP sent: {user.email}")
+    return {
+        "message": result["message"],
+        "user": user_schema.UserOut.from_orm(result["data"]) if result["data"] else None
+    }
+
 
 @router.post("/verify-otp", response_model=dict)
 def verify_user_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db)):
     """Verify OTP for user email verification."""
     result = crud_user.verify_otp(db, data.email, data.otp)
-    if result is None:
-        logger.error(f"Invalid OTP for email: {data.email}")
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    if isinstance(result, str) and result == "expired":
-        logger.error(f"Expired OTP for email: {data.email}")
-        raise HTTPException(status_code=400, detail="OTP expired")
-    access_token = create_access_token(data={"sub": result.email})
+    if not result["success"]:
+        logger.error(f"OTP verification failed for {data.email}: {result['message']}")
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    access_token = create_access_token(data={"sub": result["data"].email})
     logger.info(f"User verified successfully: {data.email}")
     return {
-        "message": "Email verified successfully. A welcome email has been sent. You can now login with email and password.",
+        "message": "Email verified successfully. You can now login.",
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {
-            "id": result.id,
-            "email": result.email,
-            "name": result.name,
-            "profile_pic": result.profile_pic,
-            "new_fcm_token": result.new_fcm_token,
-            "is_superuser": result.is_superuser
-        }
+        "user": user_schema.UserOut.from_orm(result["data"])
     }
+
 
 @router.post("/resend-otp", response_model=dict)
 def resend_user_otp(data: user_schema.OTPResend, db: Session = Depends(get_db)):
     """Resend OTP for email verification."""
-    otp = crud_user.resend_otp(db, data.email)
-    if not otp:
-        logger.error(f"User not found for OTP resend: {data.email}")
-        raise HTTPException(status_code=404, detail="User not found")
-    logger.info(f"OTP resent successfully for email: {data.email}")
-    return {"message": "New OTP sent successfully."}
+    result = crud_user.resend_otp(db, data.email)
+    if not result["success"]:
+        logger.error(f"OTP resend failed: {result['message']}")
+        raise HTTPException(status_code=404, detail=result["message"])
 
-@router.post("/login", response_model=dict)
-def login_user(login_data: user_schema.LoginRequest, request: Request, db: Session = Depends(get_db)):
-    """Authenticate user and return access token."""
-    user = crud_user.authenticate_user(
-        db,
-        login_data.email,
-        login_data.password,
-        new_fcm_token=login_data.new_fcm_token,
-        device_id=login_data.device_id,
-        device_type=login_data.device_type,
-        os_version=login_data.os_version,
-        app_version=login_data.app_version,
-        ip_address=request.client.host
-    )
-    if not user:
-        logger.error(f"Login failed for email: {login_data.email}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    access_token = create_access_token(data={"sub": user.email})
-    logger.info(f"User logged in successfully: {user.email}")
+    logger.info(f"OTP resent successfully for {data.email}")
     return {
-        "message": "Login successful",
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "mobile": user.mobile,
-            "profile_pic": user.profile_pic,
-            "is_superuser": user.is_superuser,
-            "last_login_at": user.last_login_at,
-            "last_login_ip": user.last_login_ip,
-            "old_fcm_token": user.old_fcm_token,
-            "new_fcm_token": user.new_fcm_token,
-            "device_id": user.device_id,
-            "device_type": user.device_type,
-            "os_version": user.os_version,
-            "app_version": user.app_version,
-            "addresses": [
-                {
-                    "id": addr.id,
-                    "name": addr.name,
-                    "phone": addr.phone,
-                    "address": addr.address,
-                    "landmark": addr.landmark,
-                    "city": addr.city,
-                    "state": addr.state,
-                    "pincode": addr.pincode,
-                    "country": addr.country,
-                    "address_type": addr.address_type,
-                    "is_default": addr.is_default
-                }
-                for addr in user.addresses
-            ],
-            "default_address": next((addr for addr in user.addresses if addr.is_default), None)
-        }
+        "message": result["message"],
+        "otp": result.get("otp")  # optional, can remove in production
     }
-
 @router.post("/password-reset/request", response_model=dict)
 def request_password_reset(request: user_schema.PasswordResetRequest, db: Session = Depends(get_db)):
     """Request password reset OTP."""
