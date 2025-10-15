@@ -15,7 +15,7 @@
 # configure_mappers()
 
 # app/models/__init__.py
-from .user import User, UserStatus, LoginLog
+from .user import User, UserStatus
 from .user_address import UserAddress
 from .category import Category
 from .sub_category import SubCategory
