@@ -101,12 +101,14 @@
 #     email: str
 #     password: str
 
+
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class SubCategoryCharge(BaseModel):
     subcategory_id: int
-    subcategory_name: Optional[str] = None   # 👈 Subcategory name add
+    subcategory_name: Optional[str] = None
     service_charge: float
 
     class Config:
@@ -120,7 +122,8 @@ class VendorCreate(BaseModel):
     terms_accepted: bool
     identity_doc_type: str
     identity_doc_number: str
-    fcm_token: Optional[str] = None
+    new_fcm_token: Optional[str] = None
+    old_fcm_token: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
@@ -146,7 +149,8 @@ class WorkDetailsUpdate(BaseModel):
     subcategory_charges: List[SubCategoryCharge]
 
 class VendorDeviceUpdate(BaseModel):
-    fcm_token: Optional[str] = None
+    new_fcm_token: Optional[str] = None
+    old_fcm_token: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
@@ -174,7 +178,7 @@ class VendorResponse(BaseModel):
     address_doc_number: Optional[str] = None
     address_doc_url: Optional[str] = None
     category_id: Optional[int] = None
-    category_name: Optional[str] = None   # 👈 Category name add
+    category_name: Optional[str] = None
     profile_pic: Optional[str] = None
     step: Optional[int] = None
     status: str = Field(..., pattern="^(pending|approved|rejected|inactive)$")
@@ -189,7 +193,6 @@ class PaginatedVendorsResponse(BaseModel):
     vendors: List[VendorResponse]
     total: int
 
-
 class OTPRequest(BaseModel):
     email: str
 
@@ -200,3 +203,106 @@ class OTPVerify(BaseModel):
 class VendorLoginRequest(BaseModel):
     email: str
     password: str
+
+class VendorLogoutRequest(BaseModel):
+    email: str
+
+# from pydantic import BaseModel, Field
+# from typing import List, Optional
+
+# class SubCategoryCharge(BaseModel):
+#     subcategory_id: int
+#     subcategory_name: Optional[str] = None   # 👈 Subcategory name add
+#     service_charge: float
+
+#     class Config:
+#         from_attributes = True
+
+# class VendorCreate(BaseModel):
+#     full_name: str
+#     email: str
+#     phone: str
+#     password: str
+#     terms_accepted: bool
+#     identity_doc_type: str
+#     identity_doc_number: str
+#     fcm_token: Optional[str] = None
+#     latitude: Optional[float] = None
+#     longitude: Optional[float] = None
+#     device_name: Optional[str] = None
+
+# class AddressDetailsUpdate(BaseModel):
+#     address: str
+#     state: str
+#     city: str
+#     pincode: str
+#     address_doc_type: str
+#     address_doc_number: str
+
+# class BankDetailsUpdate(BaseModel):
+#     account_holder_name: str
+#     account_number: str
+#     ifsc_code: str
+#     upi_id: str
+#     bank_doc_type: str
+#     bank_doc_number: str
+
+# class WorkDetailsUpdate(BaseModel):
+#     category_id: int
+#     subcategory_charges: List[SubCategoryCharge]
+
+# class VendorDeviceUpdate(BaseModel):
+#     fcm_token: Optional[str] = None
+#     latitude: Optional[float] = None
+#     longitude: Optional[float] = None
+#     device_name: Optional[str] = None
+
+# class VendorResponse(BaseModel):
+#     id: int
+#     full_name: str
+#     email: str
+#     phone: str
+#     address: Optional[str] = None
+#     state: Optional[str] = None
+#     city: Optional[str] = None
+#     pincode: Optional[str] = None
+#     account_holder_name: Optional[str] = None
+#     account_number: Optional[str] = None
+#     ifsc_code: Optional[str] = None
+#     upi_id: Optional[str] = None
+#     identity_doc_type: Optional[str] = None
+#     identity_doc_number: Optional[str] = None
+#     identity_doc_url: Optional[str] = None
+#     bank_doc_type: Optional[str] = None
+#     bank_doc_number: Optional[str] = None
+#     bank_doc_url: Optional[str] = None
+#     address_doc_type: Optional[str] = None
+#     address_doc_number: Optional[str] = None
+#     address_doc_url: Optional[str] = None
+#     category_id: Optional[int] = None
+#     category_name: Optional[str] = None   # 👈 Category name add
+#     profile_pic: Optional[str] = None
+#     step: Optional[int] = None
+#     status: str = Field(..., pattern="^(pending|approved|rejected|inactive)$")
+#     admin_status: str = Field(..., pattern="^(active|inactive)$")
+#     work_status: str = Field(..., pattern="^(work_on|work_off)$")
+#     subcategory_charges: List[SubCategoryCharge]
+
+#     class Config:
+#         from_attributes = True
+
+# class PaginatedVendorsResponse(BaseModel):
+#     vendors: List[VendorResponse]
+#     total: int
+
+
+# class OTPRequest(BaseModel):
+#     email: str
+
+# class OTPVerify(BaseModel):
+#     email: str
+#     otp: str
+
+# class VendorLoginRequest(BaseModel):
+#     email: str
+#     password: str
