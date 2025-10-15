@@ -759,7 +759,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from app.utils.otp_utils import generate_otp, send_email_otp, send_email
+from app.utils.otp_utils import generate_otp, send_email, send_email
 from app.core.security import get_password_hash
 from app.models.service_provider_model import ServiceProvider
 from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
