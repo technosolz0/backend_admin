@@ -133,7 +133,7 @@ from email.mime.multipart import MIMEMultipart
 import os
 from datetime import datetime
 import logging
-from app.models.vendor_model import Vendor
+from app.models.service_provider_model import ServiceProvider as Vendor
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
