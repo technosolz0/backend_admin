@@ -770,7 +770,7 @@ from app.schemas.service_provider_schema import (
     BankDetailsUpdate, WorkDetailsUpdate, SubCategoryCharge, VendorResponse
 )
 from app.schemas.sub_category_schema import SubCategoryStatus
-from app.utils.notification_utils import send_notification, NotificationType
+from app.utils.fcm import send_notification, NotificationType
 import logging
 from typing import List, Tuple
 import os
