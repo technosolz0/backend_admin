@@ -170,7 +170,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://194.164.148.133:3000",
     "http://10.108.231.167:3000",
-    "https://admin.servex.in",
+    "https://admin.serwex.in",
 ]
 
 app.add_middleware(
