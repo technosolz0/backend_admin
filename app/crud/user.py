@@ -423,6 +423,7 @@
 #     return user
 
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional, List
@@ -433,9 +434,68 @@ from app.models.user import User, UserStatus
 from app.schemas import user_schema
 from app.utils.otp_utils import generate_otp, send_email
 from app.core.security import get_password_hash, verify_password
+from app.models.category import Category
+from app.models.sub_category import SubCategory
+from app.models.service_provider_model import ServiceProvider
+from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
 
 logger = logging.getLogger(__name__)
 
+
+
+def fetch_service_charges_and_vendors(db: Session, category_id: int, sub_category_id: int):
+    
+    category = db.query(Category).filter(Category.id == category_id).first()
+    subcategory = db.query(SubCategory).filter(SubCategory.id == sub_category_id).first()
+
+    if not category or not subcategory:
+        return None
+
+    # Query VendorSubcategoryCharge with joins
+    results = (
+        db.query(
+            VendorSubcategoryCharge.service_charge,
+            ServiceProvider.id.label("vendor_id"),
+            ServiceProvider.full_name,
+            ServiceProvider.email,
+            ServiceProvider.phone,
+            ServiceProvider.city,
+            ServiceProvider.state,
+            ServiceProvider.profile_pic,
+        )
+        .join(ServiceProvider, ServiceProvider.id == VendorSubcategoryCharge.vendor_id)
+        .filter(
+            and_(
+                VendorSubcategoryCharge.category_id == category_id,
+                VendorSubcategoryCharge.subcategory_id == sub_category_id,
+            )
+        )
+        .all()
+    )
+
+    if not results:
+        return []
+
+    response = []
+    for row in results:
+        response.append({
+            "service_charge": row.service_charge,
+            "vendor_details": {
+                "id": row.vendor_id,
+                "name": row.full_name,
+                "email": row.email,
+                "contact": row.phone,
+                "city": row.city,
+                "state": row.state,
+                "profile_pic": row.profile_pic
+            }
+        })
+
+    return {
+        "category": {"id": category.id, "name": category.name},
+        "subcategory": {"id": subcategory.id, "name": subcategory.name},
+        "vendors": response
+    }
 
 # ------------------- Basic Getters -------------------
 
