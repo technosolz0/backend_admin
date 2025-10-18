@@ -214,48 +214,7 @@
 #     return {"message": "New OTP sent successfully."}
 
 
-# # 🔐 Email/Password Login
-# @router.post("/login")
-# def login_user(login_data: user_schema.LoginRequest, db: Session = Depends(get_db)):
-#     """Login with email and password"""
-#     user = crud_user.authenticate_user(db, login_data.email, login_data.password)
-#     if not user:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Incorrect email or password",
-#             headers={"WWW-Authenticate": "Bearer"},
-#         )
-#     access_token = create_access_token(data={"sub": user.email})
-#     return {
-#         "message": "Login successful",
-#         "access_token": access_token,
-#         "token_type": "bearer",
-#         "user": {
-#             "id": user.id,
-#             "name": user.name,
-#             "email": user.email,
-#             "mobile": user.mobile,
-#             "last_login_at": user.last_login_at,
-#             "fcm_token": user.fcm_token,
-#             "addresses": [
-#                 {
-#                     "id": addr.id,
-#                     "name": addr.name,
-#                     "phone": addr.phone,
-#                     "address": addr.address,
-#                     "landmark": addr.landmark,
-#                     "city": addr.city,
-#                     "state": addr.state,
-#                     "pincode": addr.pincode,
-#                     "country": addr.country,
-#                     "address_type": addr.address_type,
-#                     "is_default": addr.is_default
-#                 }
-#                 for addr in user.addresses
-#             ],
-#             "default_address": next((addr for addr in user.addresses if addr.is_default), None)
-#         }
-#     }
+# 🔐 Email/Password Login
 
 
 # # 🔐 Password Reset Flow
@@ -416,6 +375,48 @@ def resend_user_otp(data: user_schema.OTPResend, db: Session = Depends(get_db)):
         "message": result["message"],
         "otp": result.get("otp")  # optional, can remove in production
     }
+@router.post("/login")
+def login_user(login_data: user_schema.LoginRequest, db: Session = Depends(get_db)):
+    """Login with email and password"""
+    user = crud_user.authenticate_user(db, login_data.email, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user.email})
+    return {
+        "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "mobile": user.mobile,
+            "last_login_at": user.last_login_at,
+            "fcm_token": user.fcm_token,
+            "addresses": [
+                {
+                    "id": addr.id,
+                    "name": addr.name,
+                    "phone": addr.phone,
+                    "address": addr.address,
+                    "landmark": addr.landmark,
+                    "city": addr.city,
+                    "state": addr.state,
+                    "pincode": addr.pincode,
+                    "country": addr.country,
+                    "address_type": addr.address_type,
+                    "is_default": addr.is_default
+                }
+                for addr in user.addresses
+            ],
+            "default_address": next((addr for addr in user.addresses if addr.is_default), None)
+        }
+    }
+
 @router.post("/password-reset/request", response_model=dict)
 def request_password_reset(request: user_schema.PasswordResetRequest, db: Session = Depends(get_db)):
     """Request password reset OTP."""
