@@ -8,7 +8,7 @@
 # from passlib.context import CryptContext
 # from sqlalchemy.orm import Session
 # from sqlalchemy.exc import SQLAlchemyError
-# from app.utils.otp_utils import generate_otp, send_email_otp
+# from app.utils.otp_utils import generate_otp, send_email
 # from app.core.security import get_password_hash
 # from app.models.service_provider_model import ServiceProvider
 # from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
@@ -204,7 +204,7 @@
 #         existing.otp_last_sent_at = datetime.utcnow()
 #         db.commit()
 #         db.refresh(existing)
-#         send_email_otp(vendor.email, existing.otp)
+#         send_email(vendor.email, existing.otp)
 #         return existing
     
 #     hashed_password = get_password_hash(vendor.password)
@@ -238,7 +238,7 @@
 #     db.commit()
 #     db.refresh(db_vendor)
     
-#     send_email_otp(vendor.email, otp)
+#     send_email(vendor.email, otp)
 #     return db_vendor
 
 # def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse, str]:
@@ -312,7 +312,7 @@
 #     vendor.otp_created_at = datetime.utcnow()
 #     vendor.otp_last_sent_at = datetime.utcnow()
 #     vendor.otp_attempts = 0
-#     send_email_otp(email, otp)
+#     send_email(email, otp)
 #     db.commit()
 
 # def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
@@ -937,7 +937,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
         existing.otp_last_sent_at = datetime.utcnow()
         db.commit()
         db.refresh(existing)
-        send_email_otp(vendor.email, existing.otp)
+        send_email(vendor.email, existing.otp)
         return existing
     
     hashed_password = get_password_hash(vendor.password)
@@ -972,7 +972,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
     db.commit()
     db.refresh(db_vendor)
     
-    send_email_otp(vendor.email, otp)
+    send_email(vendor.email, otp)
     return db_vendor
 
 def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse, str]:
@@ -1036,7 +1036,7 @@ def resend_otp(db: Session, email: str) -> None:
     vendor.otp_created_at = datetime.utcnow()
     vendor.otp_last_sent_at = datetime.utcnow()
     vendor.otp_attempts = 0
-    send_email_otp(email, otp)
+    send_email(email, otp)
     db.commit()
 
 def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
@@ -1285,7 +1285,7 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
 # from sqlalchemy.orm import joinedload
 # from sqlalchemy.orm import Session
 # from sqlalchemy.exc import SQLAlchemyError
-# from app.utils.otp_utils import generate_otp, send_email_otp
+# from app.utils.otp_utils import generate_otp, send_email
 # from app.core.security import get_password_hash
 # from app.models.service_provider_model import ServiceProvider
 # from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
@@ -1556,7 +1556,7 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
 #         existing.otp_last_sent_at = datetime.utcnow()
 #         db.commit()
 #         db.refresh(existing)
-#         send_email_otp(vendor.email, existing.otp)
+#         send_email(vendor.email, existing.otp)
 #         return existing
     
 #     hashed_password = get_password_hash(vendor.password)
@@ -1590,7 +1590,7 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
 #     db.commit()
 #     db.refresh(db_vendor)
     
-#     send_email_otp(vendor.email, otp)
+#     send_email(vendor.email, otp)
 #     return db_vendor
 
 # def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse, str]:
@@ -1636,7 +1636,7 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
 #     vendor.otp_created_at = datetime.utcnow()
 #     vendor.otp_last_sent_at = datetime.utcnow()
 #     vendor.otp_attempts = 0
-#     send_email_otp(email, otp)
+#     send_email(email, otp)
 #     db.commit()
 
 # def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
