@@ -375,17 +375,33 @@ def resend_user_otp(data: user_schema.OTPResend, db: Session = Depends(get_db)):
         "message": result["message"],
         "otp": result.get("otp")  # optional, can remove in production
     }
+
 @router.post("/login")
 def login_user(login_data: user_schema.LoginRequest, db: Session = Depends(get_db)):
-    """Login with email and password"""
-    user = crud_user.authenticate_user(db, login_data.email, login_data.password)
+    """
+    Login user with email and password.
+    Returns access token and user data.
+    """
+    user = crud_user.authenticate_user(
+        db,
+        email=login_data.email,
+        password=login_data.password,
+        new_fcm_token=login_data.fcm_token if hasattr(login_data, "fcm_token") else None,
+        device_id=login_data.device_id if hasattr(login_data, "device_id") else None,
+        device_type=login_data.device_type if hasattr(login_data, "device_type") else None,
+        os_version=login_data.os_version if hasattr(login_data, "os_version") else None,
+        app_version=login_data.app_version if hasattr(login_data, "app_version") else None,
+    )
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect email or password, or user not verified",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     access_token = create_access_token(data={"sub": user.email})
+
     return {
         "message": "Login successful",
         "access_token": access_token,
@@ -396,7 +412,7 @@ def login_user(login_data: user_schema.LoginRequest, db: Session = Depends(get_d
             "email": user.email,
             "mobile": user.mobile,
             "last_login_at": user.last_login_at,
-            "fcm_token": user.fcm_token,
+            "fcm_token": user.new_fcm_token,
             "addresses": [
                 {
                     "id": addr.id,
@@ -416,7 +432,6 @@ def login_user(login_data: user_schema.LoginRequest, db: Session = Depends(get_d
             "default_address": next((addr for addr in user.addresses if addr.is_default), None)
         }
     }
-
 @router.post("/password-reset/request", response_model=dict)
 def request_password_reset(request: user_schema.PasswordResetRequest, db: Session = Depends(get_db)):
     """Request password reset OTP."""

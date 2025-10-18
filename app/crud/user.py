@@ -565,6 +565,13 @@ def resend_otp(db: Session, email: str) -> dict:
         logger.exception("Error in resend_otp")
         return {"success": False, "message": str(e), "data": None}
 # ------------------- Authentication -------------------
+from typing import Optional
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
+from app.models.user import User
+from app.core.security import verify_password
+from app.crud.user import get_user_by_email
 
 def authenticate_user(
     db: Session,
@@ -576,16 +583,22 @@ def authenticate_user(
     os_version: Optional[str] = None,
     app_version: Optional[str] = None,
     ip_address: Optional[str] = None
-) -> dict:
-    """Authenticate user and update login details."""
+) -> Optional[User]:
+    """
+    Authenticate user and update login details.
+    Returns User object on success, None on failure.
+    """
     try:
         user = get_user_by_email(db, email)
         if not user or not user.is_verified or not verify_password(password, user.hashed_password):
-            return {"success": False, "message": "Invalid credentials or user not verified", "data": None}
+            return None  # Failed authentication
 
+        # Update last login info
         user.last_login_at = datetime.utcnow()
         if ip_address:
             user.last_login_ip = ip_address
+
+        # Update FCM and device info
         if new_fcm_token:
             user.old_fcm_token = user.new_fcm_token
             user.new_fcm_token = new_fcm_token
@@ -596,15 +609,14 @@ def authenticate_user(
 
         db.commit()
         db.refresh(user)
-        return {"success": True, "message": "Login successful", "data": user}
+        return user
 
     except SQLAlchemyError:
         db.rollback()
-        return {"success": False, "message": "Database error occurred", "data": None}
+        return None
     except Exception:
         db.rollback()
-        return {"success": False, "message": "Something went wrong", "data": None}
-
+        return None
 
 # ------------------- Password Reset -------------------
 
