@@ -386,15 +386,15 @@ def create_booking(
     logger.info(f"Booking created successfully: ID {booking_result.id}")
 
     # Send notifications to user and vendor
-    fcm_token = user.new_fcm_token or user.old_fcm_token or user.fcm_token
+    user_fcm_token = user.new_fcm_token or user.old_fcm_token
     send_booking_notification(
-        db, booking_result, NotificationType.booking_created, 
-        recipient=user.email, recipient_id=user.id, fcm_token=fcm_token
+        db, booking_result, NotificationType.booking_created,
+        recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
     )
     
     vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking_result.serviceprovider_id)
     if vendor:
-        vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token or vendor.fcm_token
+        vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
         send_booking_notification(
             db, booking_result, NotificationType.booking_created, 
             recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
@@ -461,7 +461,7 @@ def update_booking_status(
         if notification_type:
             user = booking_crud.get_user_by_id(db, booking.user_id)
             if user:
-                user_fcm_token = user.new_fcm_token or user.old_fcm_token or user.fcm_token
+                user_fcm_token = user.new_fcm_token or user.old_fcm_token
                 send_booking_notification(
                     db, booking_result, notification_type, 
                     recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
@@ -476,7 +476,7 @@ def update_booking_status(
                         logger.warning(f"No payment found for completed booking {booking_id}")
             
             # Notify vendor as well
-            vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token or vendor.fcm_token
+            vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
             send_booking_notification(
                 db, booking_result, notification_type, 
                 recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
@@ -509,16 +509,16 @@ def create_payment(
     payment_result = payment_crud.create_payment(db, payment)
     
     # Send notification to user and vendor
-    user_fcm_token = user.new_fcm_token or user.old_fcm_token or user.fcm_token
+    user_fcm_token = user.new_fcm_token or user.old_fcm_token
     send_booking_notification(
-        db, booking, NotificationType.payment_created, 
+        db, booking, NotificationType.payment_created,
         recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
     )
     vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
     if vendor:
-        vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token or vendor.fcm_token
+        vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
         send_booking_notification(
-            db, booking, NotificationType.payment_created, 
+            db, booking, NotificationType.payment_created,
             recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
         )
 
@@ -635,16 +635,16 @@ def cancel_booking(
         booking_crud.update_booking_status(db, booking, BookingStatus.cancelled)
         
         # Send notifications to user and vendor
-        user_fcm_token = user.new_fcm_token or user.old_fcm_token or user.fcm_token
+        user_fcm_token = user.new_fcm_token or user.old_fcm_token
         send_booking_notification(
-            db, booking, NotificationType.booking_cancelled, 
+            db, booking, NotificationType.booking_cancelled,
             recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
         )
         vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
         if vendor:
-            vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token or vendor.fcm_token
+            vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
             send_booking_notification(
-                db, booking, NotificationType.booking_cancelled, 
+                db, booking, NotificationType.booking_cancelled,
                 recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
             )
         
@@ -683,7 +683,7 @@ def send_completion_otp(
     logger.info(f"Completion OTP sent to user for booking {booking_id}")
 
     # Send notification to user
-    user_fcm_token = user.new_fcm_token or user.old_fcm_token or user.fcm_token
+    user_fcm_token = user.new_fcm_token or user.old_fcm_token
     send_booking_notification(
         db, booking, NotificationType.otp_sent, 
         recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
