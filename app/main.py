@@ -31,12 +31,12 @@
 
 # # CORS config
 # origins = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-#     "http://194.164.148.133:3000/",
+#     "http://localhost:3002",
+#     "http://127.0.0.1:3002",
+#     "http://194.164.148.133:3002/",
 #     # Add your production domains here
-#     "http://194.164.148.133:3000",
-#     "http://10.108.231.167:3000",
+#     "http://194.164.148.133:3002",
+#     "http://10.108.231.167:3002",
 # ]
 
 # app.add_middleware(
@@ -166,10 +166,10 @@ def on_startup():
 # CORS configuration
 # -------------------------
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://194.164.148.133:3000",
-    "http://10.108.231.167:3000",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://194.164.148.133:3002",
+    "http://10.108.231.167:3002",
     "https://admin.serwex.in",
 ]
 
