@@ -396,6 +396,16 @@
 
 #     return {"message": "OTP sent to user email"}
 
+
+
+
+
+
+
+
+
+
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date
@@ -425,7 +435,25 @@ class NotificationType(str, Enum):
 
 from app.utils.fcm import send_notification
 
-def send_booking_notification(db: Session, booking, notification_type: NotificationType, recipient: str, recipient_id: int, fcm_token: Optional[str] = None):
+def get_fcm_token(user_or_vendor) -> Optional[str]:
+    """Helper to get FCM token with fallback."""
+    if hasattr(user_or_vendor, 'new_fcm_token') and user_or_vendor.new_fcm_token:
+        return user_or_vendor.new_fcm_token
+    if hasattr(user_or_vendor, 'old_fcm_token') and user_or_vendor.old_fcm_token:
+        return user_or_vendor.old_fcm_token
+    if hasattr(user_or_vendor, 'fcm_token') and user_or_vendor.fcm_token:
+        return user_or_vendor.fcm_token
+    return None
+
+def send_booking_notification(
+    db: Session, 
+    booking, 
+    notification_type: NotificationType, 
+    recipient: str, 
+    recipient_id: int, 
+    fcm_token: Optional[str] = None
+):
+    """Send booking notification with error handling."""
     messages = {
         NotificationType.booking_created: f"Your booking #{booking.id} has been created successfully.",
         NotificationType.booking_accepted: f"Your booking #{booking.id} has been accepted by the vendor.",
@@ -449,51 +477,71 @@ def send_booking_notification(db: Session, booking, notification_type: Notificat
 
 def enrich_booking(db: Session, booking) -> dict:
     """Attach user name, category/subcategory names, and service name to booking output."""
-    cat = category.get_category_by_id(db, booking.category_id)
-    subcat = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
-    user = db.query(User).filter(User.id == booking.user_id).first()
-    
-    booking_dict = {
-        "id": booking.id,
-        "user_id": booking.user_id,
-        "serviceprovider_id": booking.serviceprovider_id,
-        "category_id": booking.category_id,
-        "subcategory_id": booking.subcategory_id,
-        "status": booking.status.value if hasattr(booking.status, 'value') else booking.status,
-        "booking_date": booking.booking_date,
-        "scheduled_time": booking.scheduled_time.isoformat() if hasattr(booking, 'scheduled_time') and booking.scheduled_time else None,
-        "total_amount": float(booking.total_amount) if booking.total_amount else 0.0,
-        "otp": booking.otp,
-        "created_at": booking.created_at.isoformat() if booking.created_at else None,
-        "updated_at": booking.updated_at.isoformat() if booking.updated_at else None,
-        "completed_at": booking.completed_at.isoformat() if booking.completed_at else None,
-        "user_name": f"{user.first_name} {user.last_name}" if user else "Unknown User",
-        "category_name": cat.name if cat else None,
-        "subcategory_name": subcat.name if subcat else None,
-        "service_name": subcat.name if subcat else None,
-    }
-    
-    return booking_dict
+    try:
+        cat = category.get_category_by_id(db, booking.category_id)
+        subcat = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
+        user = db.query(User).filter(User.id == booking.user_id).first()
+        
+        booking_dict = {
+            "id": booking.id,
+            "user_id": booking.user_id,
+            "serviceprovider_id": booking.serviceprovider_id,
+            "category_id": booking.category_id,
+            "subcategory_id": booking.subcategory_id,
+            "status": booking.status.value if hasattr(booking.status, 'value') else booking.status,
+            "booking_date": booking.booking_date,
+            "scheduled_time": booking.scheduled_time.isoformat() if hasattr(booking, 'scheduled_time') and booking.scheduled_time else None,
+            "total_amount": float(booking.total_amount) if booking.total_amount else 0.0,
+            "otp": booking.otp,
+            "created_at": booking.created_at.isoformat() if booking.created_at else None,
+            "updated_at": booking.updated_at.isoformat() if booking.updated_at else None,
+            "completed_at": booking.completed_at.isoformat() if booking.completed_at else None,
+            "user_name": f"{user.first_name} {user.last_name}" if user and hasattr(user, 'first_name') else "Unknown User",
+            "category_name": cat.name if cat else None,
+            "subcategory_name": subcat.name if subcat else None,
+            "service_name": subcat.name if subcat else None,
+        }
+        
+        return booking_dict
+    except Exception as e:
+        logger.error(f"Error enriching booking {booking.id}: {str(e)}")
+        raise
 
-@router.post("/", response_model=BookingOut)
+@router.post("/", response_model=dict)
 def create_booking(
     booking: BookingCreate,
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
+    """Create a new booking."""
     if booking.user_id != user.id:
         logger.warning(f"Unauthorized attempt to create booking for user_id {booking.user_id} by user {user.id}")
         raise HTTPException(status_code=403, detail="You can't create booking for another user.")
 
-    booking_result = booking_crud.create_booking(db, booking)
-    logger.info(f"Booking created successfully: ID {booking_result.id}")
+    try:
+        booking_result = booking_crud.create_booking(db, booking)
+        logger.info(f"Booking created successfully: ID {booking_result.id}")
 
-    send_booking_notification(db, booking_result, NotificationType.booking_created, recipient=user.email, recipient_id=user.id, fcm_token=user.fcm_token)
-    vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking_result.serviceprovider_id)
-    if vendor:
-        send_booking_notification(db, booking_result, NotificationType.booking_created, recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor.fcm_token)
+        # Send notification to user
+        user_fcm = get_fcm_token(user)
+        send_booking_notification(
+            db, booking_result, NotificationType.booking_created, 
+            recipient=user.email, recipient_id=user.id, fcm_token=user_fcm
+        )
+        
+        # Send notification to vendor
+        vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking_result.serviceprovider_id)
+        if vendor:
+            vendor_fcm = get_fcm_token(vendor)
+            send_booking_notification(
+                db, booking_result, NotificationType.booking_created, 
+                recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm
+            )
 
-    return enrich_booking(db, booking_result)
+        return enrich_booking(db, booking_result)
+    except Exception as e:
+        logger.error(f"Error creating booking: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating booking: {str(e)}")
 
 @router.get("/", response_model=List[dict])
 def get_all_bookings(
@@ -503,19 +551,25 @@ def get_all_bookings(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100)
 ):
-    if status:
-        bookings = booking_crud.get_bookings_by_user_and_status(db, user.id, status, skip, limit)
-    else:
-        bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
-    return [enrich_booking(db, b) for b in bookings]
+    """Get all user bookings with optional status filter."""
+    try:
+        if status:
+            bookings = booking_crud.get_bookings_by_user_and_status(db, user.id, status, skip, limit)
+        else:
+            bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
+        return [enrich_booking(db, b) for b in bookings]
+    except Exception as e:
+        logger.error(f"Error fetching bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching bookings: {str(e)}")
 
 @router.get("/{booking_id}", response_model=dict)
 def get_booking(
     booking_id: int,
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_current_user, use_cache=False),
-    vendor: Optional[dict] = Depends(get_current_vendor, use_cache=False),
+    user: Optional[User] = Depends(get_current_user, use_cache=False),
+    vendor: Optional[Vendor] = Depends(get_current_vendor, use_cache=False),
 ):
+    """Get single booking by ID."""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -532,6 +586,7 @@ def update_booking_status(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
 ):
+    """Update booking status (vendor only)."""
     from app.utils.otp_utils import send_receipt_email
 
     booking = booking_crud.get_booking_by_id(db, booking_id)
@@ -548,19 +603,32 @@ def update_booking_status(
             notification_type = NotificationType.booking_accepted
         elif update_data.status == BookingStatus.completed:
             notification_type = NotificationType.booking_completed
+        elif update_data.status == BookingStatus.cancelled:
+            notification_type = NotificationType.booking_cancelled
 
         if notification_type:
             user = booking_crud.get_user_by_id(db, booking.user_id)
             if user:
-                send_booking_notification(db, booking_result, notification_type, recipient=user.email, recipient_id=user.id, fcm_token=user.fcm_token)
+                user_fcm = get_fcm_token(user)
+                send_booking_notification(
+                    db, booking_result, notification_type, 
+                    recipient=user.email, recipient_id=user.id, fcm_token=user_fcm
+                )
                 
+                # Send receipt email when booking is completed
                 if notification_type == NotificationType.booking_completed:
                     payment = payment_crud.get_payment_by_booking_id(db, booking_id)
-                    send_receipt_email(db, booking_result, payment, user.email)
+                    if payment:
+                        send_receipt_email(db, booking_result, payment, user.email)
+                    else:
+                        logger.warning(f"No payment found for completed booking {booking_id}")
 
         return enrich_booking(db, booking_result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating booking status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error updating booking status: {str(e)}")
 
 @router.post("/{booking_id}/payment", response_model=PaymentOut)
 def create_payment(
@@ -569,6 +637,7 @@ def create_payment(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
+    """Create payment for booking."""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -581,22 +650,38 @@ def create_payment(
     if existing_payment:
         raise HTTPException(status_code=400, detail="Payment already exists for this booking")
 
-    payment_result = payment_crud.create_payment(db, payment)
-    
-    send_booking_notification(db, booking, NotificationType.payment_created, recipient=user.email, recipient_id=user.id, fcm_token=user.fcm_token)
-    vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
-    if vendor:
-        send_booking_notification(db, booking, NotificationType.payment_created, recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor.fcm_token)
+    try:
+        payment_result = payment_crud.create_payment(db, payment)
+        
+        # Send notification to user
+        user_fcm = get_fcm_token(user)
+        send_booking_notification(
+            db, booking, NotificationType.payment_created, 
+            recipient=user.email, recipient_id=user.id, fcm_token=user_fcm
+        )
+        
+        # Send notification to vendor
+        vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
+        if vendor:
+            vendor_fcm = get_fcm_token(vendor)
+            send_booking_notification(
+                db, booking, NotificationType.payment_created, 
+                recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm
+            )
 
-    return payment_result
+        return payment_result
+    except Exception as e:
+        logger.error(f"Error creating payment: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating payment: {str(e)}")
 
 @router.get("/{booking_id}/payment", response_model=PaymentOut)
 def get_payment(
     booking_id: int,
     db: Session = Depends(get_db),
-    user: Optional[dict] = Depends(get_current_user, use_cache=False),
-    vendor: Optional[dict] = Depends(get_current_vendor, use_cache=False),
+    user: Optional[User] = Depends(get_current_user, use_cache=False),
+    vendor: Optional[Vendor] = Depends(get_current_vendor, use_cache=False),
 ):
+    """Get payment for booking."""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -617,40 +702,55 @@ def get_vendor_bookings(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100)
 ):
+    """Get vendor bookings with optional status filter."""
     logger.info(f"Fetching bookings for vendor ID: {vendor.id}")
     
-    if status:
-        bookings = booking_crud.get_bookings_by_vendor_and_status(db, vendor.id, status, skip, limit)
-    else:
-        bookings = booking_crud.get_bookings_by_vendor_id(db, vendor.id, skip, limit)
-    
-    logger.info(f"Found {len(bookings)} bookings for vendor ID: {vendor.id}")
-    return [enrich_booking(db, b) for b in bookings]
+    try:
+        if status:
+            bookings = booking_crud.get_bookings_by_vendor_and_status(db, vendor.id, status, skip, limit)
+        else:
+            bookings = booking_crud.get_bookings_by_vendor_id(db, vendor.id, skip, limit)
+        
+        logger.info(f"Found {len(bookings)} bookings for vendor ID: {vendor.id}")
+        return [enrich_booking(db, b) for b in bookings]
+    except Exception as e:
+        logger.error(f"Error fetching vendor bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching vendor bookings: {str(e)}")
 
 @router.get("/vendor/stats")
 def get_vendor_booking_stats(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
 ):
+    """Get vendor booking statistics."""
     logger.info(f"Fetching stats for vendor ID: {vendor.id}")
     
-    stats = booking_crud.get_booking_count_by_status(db, vendor_id=vendor.id)
-    recent_bookings = booking_crud.get_recent_bookings(db, vendor_id=vendor.id, limit=5)
-    
-    return {
-        "total_bookings": sum(stat.count for stat in stats),
-        "status_counts": {stat.status.value: stat.count for stat in stats},
-        "recent_bookings": [enrich_booking(db, b) for b in recent_bookings],
-    }
+    try:
+        stats = booking_crud.get_booking_count_by_status(db, vendor_id=vendor.id)
+        recent_bookings = booking_crud.get_recent_bookings(db, vendor_id=vendor.id, limit=5)
+        
+        return {
+            "total_bookings": sum(stat.count for stat in stats),
+            "status_counts": {stat.status.value: stat.count for stat in stats},
+            "recent_bookings": [enrich_booking(db, b) for b in recent_bookings],
+        }
+    except Exception as e:
+        logger.error(f"Error fetching vendor stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching vendor stats: {str(e)}")
 
 @router.get("/user/recent", response_model=List[dict])
 def get_user_recent_bookings(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
-    limit: int = 5
+    limit: int = Query(5, ge=1, le=50)
 ):
-    bookings = booking_crud.get_recent_bookings(db, user_id=user.id, limit=limit)
-    return [enrich_booking(db, b) for b in bookings]
+    """Get recent user bookings."""
+    try:
+        bookings = booking_crud.get_recent_bookings(db, user_id=user.id, limit=limit)
+        return [enrich_booking(db, b) for b in bookings]
+    except Exception as e:
+        logger.error(f"Error fetching recent bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching recent bookings: {str(e)}")
 
 @router.get("/user/search")
 def search_user_bookings(
@@ -660,33 +760,38 @@ def search_user_bookings(
     status: Optional[BookingStatus] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    skip: int = 0,
-    limit: int = 10
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100)
 ):
-    start_dt = datetime.combine(start_date, datetime.min.time()) if start_date else None
-    end_dt = datetime.combine(end_date, datetime.max.time()) if end_date else None
+    """Search user bookings with filters."""
+    try:
+        start_dt = datetime.combine(start_date, datetime.min.time()) if start_date else None
+        end_dt = datetime.combine(end_date, datetime.max.time()) if end_date else None
 
-    bookings = booking_crud.search_bookings(
-        db,
-        user_id=user.id,
-        vendor_id=vendor_id,
-        status=status,
-        start_date=start_dt,
-        end_date=end_dt,
-        skip=skip,
-        limit=limit,
-    )
+        bookings = booking_crud.search_bookings(
+            db,
+            user_id=user.id,
+            vendor_id=vendor_id,
+            status=status,
+            start_date=start_dt,
+            end_date=end_dt,
+            skip=skip,
+            limit=limit,
+        )
 
-    return {
-        "bookings": [enrich_booking(db, b) for b in bookings],
-        "total": len(bookings),
-        "filters_applied": {
-            "vendor_id": vendor_id,
-            "status": status.value if status else None,
-            "start_date": start_date,
-            "end_date": end_date,
-        },
-    }
+        return {
+            "bookings": [enrich_booking(db, b) for b in bookings],
+            "total": len(bookings),
+            "filters_applied": {
+                "vendor_id": vendor_id,
+                "status": status.value if status else None,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error searching bookings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error searching bookings: {str(e)}")
 
 @router.delete("/{booking_id}")
 def cancel_booking(
@@ -694,6 +799,7 @@ def cancel_booking(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
+    """Cancel a booking."""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -701,14 +807,29 @@ def cancel_booking(
         raise HTTPException(status_code=403, detail="Unauthorized access")
 
     if booking.status in [BookingStatus.pending, BookingStatus.accepted]:
-        booking_crud.update_booking_status(db, booking, BookingStatus.cancelled)
-        
-        send_booking_notification(db, booking, NotificationType.booking_cancelled, recipient=user.email, recipient_id=user.id, fcm_token=user.fcm_token)
-        vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
-        if vendor:
-            send_booking_notification(db, booking, NotificationType.booking_cancelled, recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor.fcm_token)
-        
-        return {"message": "Booking cancelled successfully"}
+        try:
+            booking_crud.update_booking_status(db, booking, BookingStatus.cancelled)
+            
+            # Send notification to user
+            user_fcm = get_fcm_token(user)
+            send_booking_notification(
+                db, booking, NotificationType.booking_cancelled, 
+                recipient=user.email, recipient_id=user.id, fcm_token=user_fcm
+            )
+            
+            # Send notification to vendor
+            vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking.serviceprovider_id)
+            if vendor:
+                vendor_fcm = get_fcm_token(vendor)
+                send_booking_notification(
+                    db, booking, NotificationType.booking_cancelled, 
+                    recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm
+                )
+            
+            return {"message": "Booking cancelled successfully"}
+        except Exception as e:
+            logger.error(f"Error cancelling booking: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error cancelling booking: {str(e)}")
     else:
         raise HTTPException(status_code=400, detail=f"Cannot cancel booking with status {booking.status}")
 
@@ -718,6 +839,7 @@ def send_completion_otp(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
 ):
+    """Send OTP to user for booking completion."""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -726,19 +848,50 @@ def send_completion_otp(
     if booking.status != BookingStatus.accepted:
         raise HTTPException(status_code=400, detail="Booking must be accepted to send completion OTP")
 
-    from app.utils.otp_utils import generate_otp, send_email
-    otp = generate_otp()
-    booking.otp = otp
-    booking.otp_created_at = datetime.utcnow()
-    db.commit()
-    db.refresh(booking)
+    try:
+        from app.utils.otp_utils import generate_otp, send_email
+        
+        # Generate and save OTP
+        otp = generate_otp()
+        booking.otp = otp
+        booking.otp_created_at = datetime.utcnow()
+        db.commit()
+        db.refresh(booking)
 
-    send_email(receiver_email=booking.user.email, otp=otp, template="otp")
-    logger.info(f"Completion OTP sent to user for booking {booking_id}")
+        # Get user for email
+        user = booking_crud.get_user_by_id(db, booking.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-    send_booking_notification(db, booking, NotificationType.otp_sent, recipient=booking.user.email, recipient_id=booking.user_id, fcm_token=booking.user.fcm_token)
+        # Send OTP email
+        send_email(receiver_email=user.email, otp=otp, template="otp")
+        logger.info(f"Completion OTP sent to user for booking {booking_id}")
 
-    return {"message": "OTP sent to user email"}
+        # Send notification
+        user_fcm = get_fcm_token(user)
+        send_booking_notification(
+            db, booking, NotificationType.otp_sent, 
+            recipient=user.email, recipient_id=user.id, fcm_token=user_fcm
+        )
+
+        return {"message": "OTP sent to user email"}
+    except Exception as e:
+        logger.error(f"Error sending OTP: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error sending OTP: {str(e)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # from fastapi import APIRouter, Depends, HTTPException, Query
 # from sqlalchemy.orm import Session
