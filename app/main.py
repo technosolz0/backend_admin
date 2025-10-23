@@ -121,7 +121,10 @@ from app.api.routes import (
     booking_routes,
     payment_route,
     user_address_router,
-    delete_request_routes
+    delete_request_routes,
+    wallet_routes,
+    vendor_earnings_routes,
+    cancel_reason_routes
 )
 
 # -------------------------
@@ -193,6 +196,9 @@ app.include_router(booking_routes.router, prefix="/api")
 app.include_router(payment_route.router, prefix="/api")
 app.include_router(user_address_router.router, prefix="/api")
 app.include_router(delete_request_routes.router, prefix="/api")
+app.include_router(wallet_routes.router, prefix="/api")
+app.include_router(vendor_earnings_routes.router, prefix="/api")
+app.include_router(cancel_reason_routes.router, prefix="/api")
 
 # -------------------------
 # Custom OpenAPI with JWT
