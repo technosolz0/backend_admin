@@ -422,7 +422,7 @@
 #     db.refresh(user)
 #     return user
 
-
+# app/crud/user.py - Updated with get_user_by_email (no changes needed, but ensure it's there)
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -440,6 +440,32 @@ from app.models.service_provider_model import ServiceProvider
 from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
 
 logger = logging.getLogger(__name__)
+
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    """Get user by email."""
+    try:
+        return db.query(User).filter(User.email == email).first()
+    except SQLAlchemyError:
+        logger.error(f"DB error fetching user by email: {email}")
+        return None
+    
+# from sqlalchemy import and_
+# from sqlalchemy.orm import Session
+# from sqlalchemy.exc import SQLAlchemyError
+# from typing import Optional, List
+# from datetime import datetime, timedelta
+# import logging
+
+# from app.models.user import User, UserStatus
+# from app.schemas import user_schema
+# from app.utils.otp_utils import generate_otp, send_email
+# from app.core.security import get_password_hash, verify_password
+# from app.models.category import Category
+# from app.models.sub_category import SubCategory
+# from app.models.service_provider_model import ServiceProvider
+# from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
+
+# logger = logging.getLogger(__name__)
 
 
 
