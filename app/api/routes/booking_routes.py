@@ -450,14 +450,17 @@ def get_payment(
     if not identity:
         raise HTTPException(status_code=401, detail="Invalid or missing authentication token")
 
-    # ✅ Check if authorized (both user and service_provider supported)
     identity_type = getattr(identity, "type", None)
     identity_id = getattr(identity, "id", None)
+
+    # 🟡 DEBUG LOGS — to verify which condition fails
+    print("Booking:", booking.id, "user:", booking.user_id, "sp:", booking.serviceprovider_id)
+    print("Identity:", identity_type, identity_id)
+    print("Connected DB:", db.bind.url)
 
     if (identity_type == "user" and booking.user_id == identity_id) or \
        (identity_type == "service_provider" and booking.serviceprovider_id == identity_id):
 
-        # ✅ Fetch the payment safely
         payment = payment_crud.get_payment_by_booking_id(db, booking_id)
         if not payment:
             raise HTTPException(status_code=404, detail="Payment not found")
