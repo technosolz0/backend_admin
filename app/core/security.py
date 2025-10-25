@@ -27,12 +27,34 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 # ✅ JWT creation
-def create_access_token(data: dict, expires_delta: timedelta = None):
+# def create_access_token(data: dict, expires_delta: timedelta = None):
+#     to_encode = data.copy()
+#     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=30))
+#     to_encode.update({"exp": expire})
+#     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+#     return encoded_jwt
+
+def create_access_token(data: dict, expires_delta: timedelta = None, token_type: str = "access"):
+    """
+    Create JWT access or refresh tokens.
+    - Access token: short-lived (default 30 minutes)
+    - Refresh token: long-lived (default 30 days)
+    """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=30))
-    to_encode.update({"exp": expire})
+
+    if token_type == "refresh":
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=30))
+    else:  # access token
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=30))
+
+    to_encode.update({
+        "exp": expire,
+        "type": token_type
+    })
+
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 # ✅ DB session dependency
 def get_db():
