@@ -228,6 +228,8 @@
 #     db.refresh(booking)
 #     return True
 
+
+
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -236,7 +238,6 @@ from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
 from app.schemas.booking_schema import BookingCreate, BookingUpdate
 from typing import List, Optional
-from fastapi import HTTPException
 import logging
 
 logger = logging.getLogger(__name__)
@@ -414,20 +415,23 @@ def get_recent_bookings(db: Session, vendor_id: Optional[int] = None, user_id: O
     
     return query.limit(limit).all()
 
-def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
-    """Cancel a booking if user is authorized and booking is pending/accepted."""
+def cancel_booking(db: Session, booking_id: int, user_id: int) -> tuple[bool, Optional[str]]:
+    """Cancel a booking if user is authorized and booking is pending/accepted.
+    
+    Returns: (success: bool, error_message: Optional[str])
+    """
     booking = get_booking_by_id(db, booking_id)
     if not booking:
         logger.error(f"Booking not found: {booking_id}")
-        return False
+        return False, "Booking not found"
     
     if booking.user_id != user_id:
         logger.error(f"User {user_id} not authorized to cancel booking {booking_id}")
-        raise HTTPException(status_code=403, detail="User not authorized to cancel this booking")
+        return False, "User not authorized to cancel this booking"
     
     if booking.status not in [BookingStatus.pending, BookingStatus.accepted]:
         logger.error(f"Cannot cancel booking {booking_id} with status {booking.status}")
-        raise ValueError("Can only cancel pending or accepted bookings")
+        return False, "Can only cancel pending or accepted bookings"
     
     booking.status = BookingStatus.cancelled
     booking.updated_at = datetime.utcnow()
@@ -435,7 +439,9 @@ def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
     db.refresh(booking)
     
     logger.info(f"Booking {booking_id} cancelled successfully")
-    return True
+    return True, None
+
+
 
 
 # from datetime import datetime
@@ -448,43 +454,11 @@ def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
 # from typing import List, Optional
 # from fastapi import HTTPException
 # import logging
-# from app.utils.fcm import send_notification, NotificationType
-# from app.utils.otp_utils import send_receipt_email
-# from app.crud import payment_crud
 
 # logger = logging.getLogger(__name__)
 
-# def send_booking_notification(
-#     db: Session,
-#     booking: Booking,
-#     notification_type: NotificationType,
-#     recipient: str,
-#     recipient_id: int,
-#     fcm_token: Optional[str] = None
-# ):
-#     """Helper function to send standardized booking notifications."""
-#     from app.crud import category, subcategory
-#     cat = category.get_category_by_id(db, booking.category_id)
-#     subcat = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
-    
-#     messages = {
-#         NotificationType.booking_created: f"Your booking #{booking.id} for {subcat.name if subcat else 'N/A'} has been created.",
-#         NotificationType.booking_accepted: f"Your booking #{booking.id} for {subcat.name if subcat else 'N/A'} has been accepted.",
-#         NotificationType.booking_completed: f"Your booking #{booking.id} for {subcat.name if subcat else 'N/A'} has been completed.",
-#         NotificationType.booking_cancelled: f"Your booking #{booking.id} for {subcat.name if subcat else 'N/A'} has been cancelled."
-#     }
-    
-#     message = messages.get(notification_type, f"Booking #{booking.id} status updated to {notification_type.value}.")
-#     send_notification(
-#         recipient=recipient,
-#         notification_type=notification_type,
-#         message=message,
-#         recipient_id=recipient_id,
-#         fcm_token=fcm_token
-#     )
-
 # def create_booking(db: Session, booking_data: BookingCreate) -> Booking:
-#     """Create a new booking and send notifications."""
+#     """Create a new booking."""
 #     booking = Booking(**booking_data.dict())
 #     booking.created_at = datetime.utcnow()
 #     booking.status = BookingStatus.pending
@@ -492,36 +466,11 @@ def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
 #     db.commit()
 #     db.refresh(booking)
     
-#     # Send notifications to user and vendor
-#     user = db.query(User).filter(User.id == booking.user_id).first()
-#     vendor = db.query(Vendor).filter(Vendor.id == booking.serviceprovider_id).first()
-    
-#     if user:
-#         fcm_token = user.new_fcm_token or user.old_fcm_token
-#         send_booking_notification(
-#             db=db,
-#             booking=booking,
-#             notification_type=NotificationType.booking_created,
-#             recipient=user.email,
-#             recipient_id=user.id,
-#             fcm_token=fcm_token
-#         )
-#     if vendor:
-#         fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
-#         send_booking_notification(
-#             db=db,
-#             booking=booking,
-#             notification_type=NotificationType.booking_created,
-#             recipient=vendor.email,
-#             recipient_id=vendor.id,
-#             fcm_token=fcm_token
-#         )
-    
 #     logger.info(f"Booking created: {booking.id} for user {booking.user_id}, vendor {booking.serviceprovider_id}")
 #     return booking
 
 # def update_booking_status(db: Session, booking: Booking, status: BookingStatus, otp: Optional[str] = None) -> Booking:
-#     """Update booking status with validation and send notifications."""
+#     """Update booking status with validation."""
 #     valid_transitions = {
 #         BookingStatus.pending: [BookingStatus.accepted, BookingStatus.cancelled],
 #         BookingStatus.accepted: [BookingStatus.completed, BookingStatus.cancelled],
@@ -545,54 +494,6 @@ def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
 
 #     db.commit()
 #     db.refresh(booking)
-    
-#     # Send notifications to user and vendor
-#     user = db.query(User).filter(User.id == booking.user_id).first()
-#     vendor = db.query(Vendor).filter(Vendor.id == booking.serviceprovider_id).first()
-    
-#     if user and old_status != status:
-#         fcm_token = user.new_fcm_token or user.old_fcm_token
-#         notification_type = {
-#             BookingStatus.accepted: NotificationType.booking_accepted,
-#             BookingStatus.completed: NotificationType.booking_completed,
-#             BookingStatus.cancelled: NotificationType.booking_cancelled
-#         }.get(status)
-        
-#         if notification_type:
-#             send_booking_notification(
-#                 db=db,
-#                 booking=booking,
-#                 notification_type=notification_type,
-#                 recipient=user.email,
-#                 recipient_id=user.id,
-#                 fcm_token=fcm_token
-#             )
-            
-#             # Send receipt email when booking is completed
-#             if notification_type == NotificationType.booking_completed:
-#                 payment = payment_crud.get_payment_by_booking_id(db, booking.id)
-#                 if payment:
-#                     send_receipt_email(db, booking, payment, user.email)
-#                 else:
-#                     logger.warning(f"No payment found for completed booking {booking.id}")
-    
-#     if vendor and old_status != status:
-#         fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
-#         notification_type = {
-#             BookingStatus.accepted: NotificationType.booking_accepted,
-#             BookingStatus.completed: NotificationType.booking_completed,
-#             BookingStatus.cancelled: NotificationType.booking_cancelled
-#         }.get(status)
-        
-#         if notification_type:
-#             send_booking_notification(
-#                 db=db,
-#                 booking=booking,
-#                 notification_type=notification_type,
-#                 recipient=vendor.email,
-#                 recipient_id=vendor.id,
-#                 fcm_token=fcm_token
-#             )
     
 #     logger.info(f"Booking {booking.id} status updated to {status}")
 #     return booking
@@ -749,30 +650,6 @@ def cancel_booking(db: Session, booking_id: int, user_id: int) -> bool:
 #     db.commit()
 #     db.refresh(booking)
     
-#     # Send notifications to user and vendor
-#     user = db.query(User).filter(User.id == booking.user_id).first()
-#     vendor = db.query(Vendor).filter(Vendor.id == booking.serviceprovider_id).first()
-    
-#     if user:
-#         fcm_token = user.new_fcm_token or user.old_fcm_token
-#         send_booking_notification(
-#             db=db,
-#             booking=booking,
-#             notification_type=NotificationType.booking_cancelled,
-#             recipient=user.email,
-#             recipient_id=user.id,
-#             fcm_token=fcm_token
-#         )
-#     if vendor:
-#         fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
-#         send_booking_notification(
-#             db=db,
-#             booking=booking,
-#             notification_type=NotificationType.booking_cancelled,
-#             recipient=vendor.email,
-#             recipient_id=vendor.id,
-#             fcm_token=fcm_token
-#         )
-    
 #     logger.info(f"Booking {booking_id} cancelled successfully")
 #     return True
+
