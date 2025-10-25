@@ -38,17 +38,18 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
-
 class PaymentStatus(str, Enum):
-    PENDING = "pending"
-    SUCCESS = "success"
-    FAILED = "failed"
-    REFUNDED = "refunded"
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    REFUNDED = "REFUNDED"
+
 
 class PaymentMethod(str, Enum):
-    RAZORPAY = "razorpay"
-    CASH = "cash"
-    WALLET = "wallet"
+    RAZORPAY = "RAZORPAY"  # match DB
+    CASH = "CASH"
+    WALLET = "WALLET"
+
 
 class PaymentCreate(BaseModel):
     booking_id: int
