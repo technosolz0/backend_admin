@@ -441,7 +441,7 @@ def create_payment(
 def get_payment(
     booking_id: int,
     db: Session = Depends(get_db),
-    identity: Optional[dict] = Depends(get_current_identity),
+    identity=Depends(get_current_identity),
 ):
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
@@ -450,14 +450,22 @@ def get_payment(
     if not identity:
         raise HTTPException(status_code=401, detail="Invalid or missing authentication token")
 
-    if (identity['type'] == 'user' and booking.user_id == identity['id']) or \
-       (identity['type'] == 'vendor' and booking.serviceprovider_id == identity['id']):
+    # ✅ Check if authorized (both user and service_provider supported)
+    identity_type = getattr(identity, "type", None)
+    identity_id = getattr(identity, "id", None)
+
+    if (identity_type == "user" and booking.user_id == identity_id) or \
+       (identity_type == "service_provider" and booking.serviceprovider_id == identity_id):
+
+        # ✅ Fetch the payment safely
         payment = payment_crud.get_payment_by_booking_id(db, booking_id)
         if not payment:
             raise HTTPException(status_code=404, detail="Payment not found")
+
         return payment
-    else:
-        raise HTTPException(status_code=403, detail="Unauthorized access to this payment")
+
+    raise HTTPException(status_code=403, detail="Unauthorized access to this payment")
+
 
 @router.get("/vendor/my-bookings", response_model=List[dict])
 def get_vendor_bookings(
