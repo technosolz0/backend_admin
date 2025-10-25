@@ -436,39 +436,47 @@ def create_payment(
         )
 
     return payment_result
-
 @router.get("/{booking_id}/payment", response_model=PaymentOut)
 def get_payment(
     booking_id: int,
     db: Session = Depends(get_db),
-    identity=Depends(get_current_identity),
+    identity=Depends(get_current_identity),  # Unified identity (User or Vendor)
 ):
+    """Get payment details for a booking"""
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    if not identity:
-        raise HTTPException(status_code=401, detail="Invalid or missing authentication token")
+    # Check authorization based on identity type
+    # identity will be either a User or ServiceProvider object
+    is_authorized = False
+    
+    if isinstance(identity, User):
+        # User can access their own bookings
+        is_authorized = (booking.user_id == identity.id)
+        logger.info(f"User {identity.id} accessing payment for booking {booking_id}")
+    elif isinstance(identity, Vendor):
+        # Vendor can access bookings assigned to them
+        is_authorized = (booking.serviceprovider_id == identity.id)
+        logger.info(f"Vendor {identity.id} accessing payment for booking {booking_id}")
+    else:
+        logger.error(f"Unknown identity type: {type(identity)}")
+        raise HTTPException(status_code=401, detail="Invalid authentication")
 
-    identity_type = getattr(identity, "type", None)
-    identity_id = getattr(identity, "id", None)
+    if not is_authorized:
+        logger.warning(
+            f"Unauthorized access attempt to booking {booking_id} payment by "
+            f"{'user' if isinstance(identity, User) else 'vendor'} {identity.id}"
+        )
+        raise HTTPException(status_code=403, detail="Unauthorized access to this payment")
 
-    # 🟡 DEBUG LOGS — to verify which condition fails
-    print("Booking:", booking.id, "user:", booking.user_id, "sp:", booking.serviceprovider_id)
-    print("Identity:", identity_type, identity_id)
-    print("Connected DB:", db.bind.url)
+    # Fetch payment
+    payment = payment_crud.get_payment_by_booking_id(db, booking_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found for this booking")
 
-    if (identity_type == "user" and booking.user_id == identity_id) or \
-       (identity_type == "service_provider" and booking.serviceprovider_id == identity_id):
-
-        payment = payment_crud.get_payment_by_booking_id(db, booking_id)
-        if not payment:
-            raise HTTPException(status_code=404, detail="Payment not found")
-
-        return payment
-
-    raise HTTPException(status_code=403, detail="Unauthorized access to this payment")
-
+    logger.info(f"Payment retrieved successfully for booking {booking_id}")
+    return payment
 
 @router.get("/vendor/my-bookings", response_model=List[dict])
 def get_vendor_bookings(
