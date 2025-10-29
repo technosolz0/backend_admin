@@ -13,10 +13,12 @@ from app.models.vendor_earnings_model import VendorEarnings
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/vendor", tags=["Vendor Dashboard"])
+
+# IMPORTANT: Use a specific prefix to avoid route conflicts
+router = APIRouter(prefix="/vendor/dashboard", tags=["Vendor Dashboard"])
 
 
-@router.get("/dashboard")
+@router.get("")  # This maps to /api/vendor/dashboard
 def get_vendor_dashboard(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
@@ -79,7 +81,6 @@ def get_vendor_dashboard(
         ).scalar() or 0
         
         # ==================== PAYMENT ANALYTICS ====================
-        # Total payments for this vendor (through bookings)
         payment_stats = db.query(
             func.count(Payment.id).label('total_payments'),
             func.sum(Payment.amount).label('total_revenue'),
@@ -208,7 +209,7 @@ def get_vendor_dashboard(
         
         # ==================== RESPONSE ====================
         return {
-            # Booking Stats
+            'success': True,
             'booking_stats': {
                 'total_bookings': total_bookings,
                 'pending_bookings': pending_bookings,
@@ -223,8 +224,6 @@ def get_vendor_dashboard(
                     'cancelled': cancelled_bookings,
                 }
             },
-            
-            # Payment Analytics
             'payment_analytics': {
                 'total_payments': total_payments_count,
                 'total_revenue': total_revenue,
@@ -234,27 +233,19 @@ def get_vendor_dashboard(
                 'pending_payments': pending_payments,
                 'failed_payments': failed_payments,
             },
-            
-            # Earnings (After Commission)
             'earnings': {
-                'total_earnings': total_earnings,  # Final amount after commission
+                'total_earnings': total_earnings,
                 'total_commission': total_commission,
-                'total_paid': total_revenue,  # What customers paid
+                'total_paid': total_revenue,
                 'earnings_count': earnings_count,
                 'today_earnings': today_earnings,
             },
-            
-            # Recent Bookings
             'recent_bookings': recent_bookings,
-            
-            # Monthly Revenue
             'monthly_revenue': {
                 'year': current_year,
                 'monthly_data': monthly_data,
                 'total_annual_revenue': sum(m['revenue'] for m in monthly_data),
             },
-            
-            # Metadata
             'metadata': {
                 'vendor_id': vendor_id,
                 'generated_at': datetime.now().isoformat(),
@@ -263,14 +254,14 @@ def get_vendor_dashboard(
         }
         
     except Exception as e:
-        logger.error(f"Error generating vendor dashboard: {str(e)}")
+        logger.error(f"Error generating vendor dashboard: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate dashboard: {str(e)}"
         )
 
 
-@router.get("/dashboard/today")
+@router.get("/today")  # This maps to /api/vendor/dashboard/today
 def get_today_summary(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
@@ -302,6 +293,7 @@ def get_today_summary(
         ).scalar() or 0
         
         return {
+            'success': True,
             'today_bookings_count': len(today_bookings),
             'today_earnings': float(today_earnings),
             'today_date': today.isoformat(),
@@ -316,7 +308,7 @@ def get_today_summary(
         }
         
     except Exception as e:
-        logger.error(f"Error getting today's summary: {str(e)}")
+        logger.error(f"Error getting today's summary: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get today's summary: {str(e)}"
