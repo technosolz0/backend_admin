@@ -14,11 +14,11 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
-# IMPORTANT: Use a specific prefix to avoid route conflicts
-router = APIRouter(prefix="/vendor/dashboard", tags=["Vendor Dashboard"])
+# Changed prefix to avoid conflict with /api/vendor/{vendor_id}
+router = APIRouter(prefix="/vendor-dashboard", tags=["Vendor Dashboard"])
 
 
-@router.get("")  # This maps to /api/vendor/dashboard
+@router.get("")  # This maps to /api/vendor-dashboard
 def get_vendor_dashboard(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
@@ -261,7 +261,7 @@ def get_vendor_dashboard(
         )
 
 
-@router.get("/today")  # This maps to /api/vendor/dashboard/today
+@router.get("/today")  # This maps to /api/vendor-dashboard/today
 def get_today_summary(
     db: Session = Depends(get_db),
     vendor=Depends(get_current_vendor)
