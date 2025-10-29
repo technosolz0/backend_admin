@@ -341,6 +341,14 @@ def get_booking(
     if hasattr(identity, 'id') and hasattr(identity, 'email'):  # Valid identity
         if identity.id == booking.user_id:  # User or Vendor ID match
             return enrich_booking(db, booking)
+        
+
+        if isinstance(identity, User) and identity.id == booking.user_id:
+            return enrich_booking(db, booking)
+        
+        # Vendor access
+        elif isinstance(identity, Vendor) and identity.id == booking.serviceprovider_id:
+            return enrich_booking(db, booking)
         else:
             raise HTTPException(status_code=403, detail="Unauthorized access to this booking")
     else:
