@@ -6,7 +6,7 @@ from sqlalchemy import func, and_, extract
 from datetime import datetime
 import logging
 
-from app.core.security import get_db, get_current_user
+from app.core.security import get_db, get_current_vendor
 from app.models.booking_model import Booking, BookingStatus
 from app.models.payment_model import Payment, PaymentStatus
 from app.models.vendor_earnings_model import VendorEarnings
@@ -16,20 +16,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/vendor-dashboard", tags=["Vendor Dashboard"])
 
-# ✅ Ensure vendor role validation
-def get_current_vendor(current_user=Depends(get_current_user)):
-    if current_user.role != "vendor":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate vendor credentials",
-        )
-    return current_user
-
 
 @router.get("", summary="Get Vendor Dashboard", description="Comprehensive vendor dashboard with all stats")
 def get_vendor_dashboard(
     db: Session = Depends(get_db),
-    vendor=Depends(get_current_vendor)
+    vendor=Depends(get_current_vendor)  # ✅ Returns ServiceProvider object directly
 ):
     """Comprehensive vendor dashboard with all stats"""
     try:
