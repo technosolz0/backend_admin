@@ -439,7 +439,10 @@ def get_subcategories(category_id: Optional[int] = None, db: Session = Depends(g
 def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db)):
     try:
         vendor, message = vendor_login(db, data.email, data.password)
-        token = create_access_token({"sub": vendor.email, "role": "vendor"})
+        token = create_access_token(
+            data={"sub": vendor.email},  # only 'sub' here
+            role="vendor"                # ✅ this ensures JWT has role=vendor
+        )
         return {
             "access_token": token,
             "token_type": "bearer",
