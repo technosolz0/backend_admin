@@ -376,6 +376,27 @@ def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpd
     
     return build_vendor_response(db, vendor)
 
+# def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -> VendorResponse:
+#     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+#     if not vendor:
+#         raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+    
+#     if not vendor.otp_verified:
+#         raise HTTPException(status_code=403, detail="OTP verification required")
+    
+#     for field, value in update.dict(exclude_unset=True).items():
+#         setattr(vendor, field, value)
+    
+#     if vendor.step == 1:
+#         vendor.step = 3
+#     vendor.last_device_update = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+    
+#     return build_vendor_response(db, vendor)
+
+# app/crud/service_provider_crud.py
+
 def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
@@ -384,8 +405,30 @@ def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -
     if not vendor.otp_verified:
         raise HTTPException(status_code=403, detail="OTP verification required")
     
+    # ✅ Step 1: Update legacy fields (backward compatibility)
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
+    
+    # ✅ Step 2: Create entry in vendor_bank_accounts table
+    from app.crud import vendor_bank_crud
+    from app.schemas.service_provider_schema import BankAccountCreate
+    
+    # Check if primary bank already exists
+    existing_primary = vendor_bank_crud.get_primary_bank_account(db, vendor_id)
+    
+    if not existing_primary:
+        # Create new primary bank account from registration data
+        bank_data = BankAccountCreate(
+            account_holder_name=update.account_holder_name,
+            account_number=update.account_number,
+            ifsc_code=update.ifsc_code,
+            bank_name=None,  # Not in registration
+            branch_name=None,
+            upi_id=update.upi_id,
+            is_primary=True
+        )
+        vendor_bank_crud.create_bank_account(db, vendor_id, bank_data)
+        logger.info(f"Created primary bank account for vendor {vendor_id} from registration")
     
     if vendor.step == 1:
         vendor.step = 3
@@ -394,7 +437,6 @@ def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -
     db.refresh(vendor)
     
     return build_vendor_response(db, vendor)
-
 def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -> VendorResponse:
     logger.debug(f"Updating work details for vendor_id: {vendor_id}, update: {update.dict()}")
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
