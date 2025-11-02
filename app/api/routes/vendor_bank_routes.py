@@ -24,6 +24,7 @@ def get_db():
     finally:
         db.close()
 
+
 # -------------------
 # 1️⃣ Get all bank accounts for current vendor
 # -------------------
@@ -41,6 +42,7 @@ def get_my_bank_accounts(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch bank accounts."
         )
+
 
 # -------------------
 # 2️⃣ Create new bank account
@@ -63,6 +65,7 @@ def add_bank_account(
         logger.error(f"[BankAccount] Error creating bank account: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create bank account.")
 
+
 # -------------------
 # 3️⃣ Get specific bank account
 # -------------------
@@ -76,6 +79,7 @@ def get_bank_account(
     if not account:
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
+
 
 # -------------------
 # 4️⃣ Update bank account
@@ -92,6 +96,7 @@ def update_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
 
+
 # -------------------
 # 5️⃣ Delete bank account
 # -------------------
@@ -106,6 +111,7 @@ def delete_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
     return {"success": True, "message": "Bank account deleted successfully"}
 
+
 # -------------------
 # 6️⃣ Set bank account as primary
 # -------------------
@@ -119,3 +125,12 @@ def set_primary_bank_account(
     if not account:
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
+
+
+# -------------------
+# ⚠️ Any variable vendor_id routes should be placed AFTER fixed routes
+# -------------------
+# Example (if you have this):
+# @router.get("/{vendor_id}")
+# def get_vendor_by_id(vendor_id: int):
+#     ...
