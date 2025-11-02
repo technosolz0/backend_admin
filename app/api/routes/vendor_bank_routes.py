@@ -12,7 +12,9 @@ from app.database import SessionLocal
 from app.core.security import get_current_vendor
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/vendor", tags=["vendor"])
+
+# IMPORTANT: Don't use /vendor prefix here if you're including this router with a prefix
+router = APIRouter(tags=["vendor-bank-accounts"])
 
 # -------------------
 # DB dependency
@@ -33,6 +35,9 @@ def get_my_bank_accounts(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
+    """
+    Get all bank accounts for the authenticated vendor
+    """
     try:
         accounts = vendor_bank_crud.get_vendor_bank_accounts(db, current_vendor.id)
         return accounts
@@ -53,17 +58,26 @@ def add_bank_account(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
+    """
+    Create a new bank account for the authenticated vendor
+    """
     try:
         existing_accounts = vendor_bank_crud.get_vendor_bank_accounts(db, current_vendor.id)
         if any(acc.account_number == bank_data.account_number for acc in existing_accounts):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bank account already exists.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Bank account with this account number already exists."
+            )
         account = vendor_bank_crud.create_bank_account(db, current_vendor.id, bank_data)
         return account
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"[BankAccount] Error creating bank account: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create bank account.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create bank account."
+        )
 
 
 # -------------------
@@ -75,9 +89,15 @@ def get_bank_account(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
+    """
+    Get a specific bank account by ID
+    """
     account = vendor_bank_crud.get_bank_account_by_id(db, account_id, current_vendor.id)
     if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bank account not found"
+        )
     return account
 
 
@@ -91,10 +111,25 @@ def update_bank_account(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
-    account = vendor_bank_crud.update_bank_account(db, account_id, current_vendor.id, update_data)
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-    return account
+    """
+    Update a bank account
+    """
+    try:
+        account = vendor_bank_crud.update_bank_account(db, account_id, current_vendor.id, update_data)
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bank account not found"
+            )
+        return account
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[BankAccount] Error updating bank account {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update bank account."
+        )
 
 
 # -------------------
@@ -106,10 +141,25 @@ def delete_bank_account(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
-    success = vendor_bank_crud.delete_bank_account(db, account_id, current_vendor.id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-    return {"success": True, "message": "Bank account deleted successfully"}
+    """
+    Delete a bank account
+    """
+    try:
+        success = vendor_bank_crud.delete_bank_account(db, account_id, current_vendor.id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bank account not found"
+            )
+        return {"success": True, "message": "Bank account deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[BankAccount] Error deleting bank account {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete bank account."
+        )
 
 
 # -------------------
@@ -121,16 +171,22 @@ def set_primary_bank_account(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
-    account = vendor_bank_crud.set_primary_bank_account(db, account_id, current_vendor.id)
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-    return account
-
-
-# -------------------
-# ⚠️ Any variable vendor_id routes should be placed AFTER fixed routes
-# -------------------
-# Example (if you have this):
-# @router.get("/{vendor_id}")
-# def get_vendor_by_id(vendor_id: int):
-#     ...
+    """
+    Set a bank account as primary
+    """
+    try:
+        account = vendor_bank_crud.set_primary_bank_account(db, account_id, current_vendor.id)
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bank account not found"
+            )
+        return account
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[BankAccount] Error setting primary bank account {account_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to set primary bank account."
+        )
