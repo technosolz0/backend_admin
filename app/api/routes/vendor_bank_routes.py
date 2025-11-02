@@ -22,6 +22,7 @@ def get_db():
     finally:
         db.close()
 
+
 # =========================
 # Vendor Bank Account Routes
 # =========================
@@ -109,3 +110,19 @@ def set_primary_bank_account(
     if not account:
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
+
+
+# =========================
+# Dynamic vendor routes (always at the bottom!)
+# =========================
+
+@router.get("/{vendor_id}", response_model=BankAccountOut)
+def get_vendor_by_id(
+    vendor_id: int,
+    db: Session = Depends(get_db)
+):
+    vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    # return vendor with bank accounts or other details as needed
+    return vendor
