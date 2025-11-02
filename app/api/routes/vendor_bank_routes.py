@@ -14,7 +14,9 @@ from app.core.security import get_current_vendor
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vendor", tags=["vendor"])
 
+# -------------------
 # DB dependency
+# -------------------
 def get_db():
     db = SessionLocal()
     try:
@@ -22,12 +24,9 @@ def get_db():
     finally:
         db.close()
 
-
-# =========================
-# Vendor Bank Account Routes
-# =========================
-
+# -------------------
 # 1️⃣ Get all bank accounts for current vendor
+# -------------------
 @router.get("/bank-accounts", response_model=List[BankAccountOut])
 def get_my_bank_accounts(
     db: Session = Depends(get_db),
@@ -43,7 +42,9 @@ def get_my_bank_accounts(
             detail="Failed to fetch bank accounts."
         )
 
+# -------------------
 # 2️⃣ Create new bank account
+# -------------------
 @router.post("/bank-accounts", response_model=BankAccountOut, status_code=status.HTTP_201_CREATED)
 def add_bank_account(
     bank_data: BankAccountCreate,
@@ -62,7 +63,9 @@ def add_bank_account(
         logger.error(f"[BankAccount] Error creating bank account: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create bank account.")
 
+# -------------------
 # 3️⃣ Get specific bank account
+# -------------------
 @router.get("/bank-accounts/{account_id}", response_model=BankAccountOut)
 def get_bank_account(
     account_id: int,
@@ -74,7 +77,9 @@ def get_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
 
+# -------------------
 # 4️⃣ Update bank account
+# -------------------
 @router.put("/bank-accounts/{account_id}", response_model=BankAccountOut)
 def update_bank_account(
     account_id: int,
@@ -87,7 +92,9 @@ def update_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
 
+# -------------------
 # 5️⃣ Delete bank account
+# -------------------
 @router.delete("/bank-accounts/{account_id}", status_code=status.HTTP_200_OK)
 def delete_bank_account(
     account_id: int,
@@ -99,7 +106,9 @@ def delete_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
     return {"success": True, "message": "Bank account deleted successfully"}
 
+# -------------------
 # 6️⃣ Set bank account as primary
+# -------------------
 @router.patch("/bank-accounts/{account_id}/set-primary", response_model=BankAccountOut)
 def set_primary_bank_account(
     account_id: int,
@@ -110,19 +119,3 @@ def set_primary_bank_account(
     if not account:
         raise HTTPException(status_code=404, detail="Bank account not found")
     return account
-
-
-# =========================
-# Dynamic vendor routes (always at the bottom!)
-# =========================
-
-@router.get("/{vendor_id}", response_model=BankAccountOut)
-def get_vendor_by_id(
-    vendor_id: int,
-    db: Session = Depends(get_db)
-):
-    vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    # return vendor with bank accounts or other details as needed
-    return vendor
