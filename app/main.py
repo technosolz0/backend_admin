@@ -126,7 +126,7 @@ from app.api.routes import (
     vendor_earnings_routes,
     cancel_reason_routes,
     vendor_dashboard_routes,
-    withdrawal_routes, admin_withdrawal_routes,
+    withdrawal_routes, admin_withdrawal_routes,vendor_bank_routes,
 )
 
 # -------------------------
@@ -205,6 +205,7 @@ app.include_router(vendor_dashboard_routes.router, prefix="/api")
 
 app.include_router(withdrawal_routes.router, prefix="/api")
 app.include_router(admin_withdrawal_routes.router, prefix="/api")
+app.include_router(vendor_bank_routes.router, prefix="/api")
 
 # -------------------------
 # Custom OpenAPI with JWT
