@@ -193,6 +193,7 @@
 
 
 # app/routers/vendor_bank_router.py
+# app/routers/vendor_bank_router.py
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -212,6 +213,8 @@ from app.core.security import get_current_vendor
 # from app.core.security import get_current_admin  # Add your admin auth
 
 logger = logging.getLogger(__name__)
+
+# ✅ UPDATED PREFIX
 router = APIRouter(prefix="/banks", tags=["vendor-bank-accounts"])
 
 # Configure upload directory
@@ -245,7 +248,7 @@ class BankVerificationRequest(BaseModel):
 # -------------------
 # 1️⃣ Get all bank accounts for current vendor
 # -------------------
-@router.get("/bank-accounts", response_model=List[BankAccountOut])
+@router.get("/accounts", response_model=List[BankAccountOut])
 def get_my_bank_accounts(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
@@ -267,7 +270,7 @@ def get_my_bank_accounts(
 # -------------------
 # 2️⃣ Create new bank account
 # -------------------
-@router.post("/bank-accounts", response_model=BankAccountOut, status_code=status.HTTP_201_CREATED)
+@router.post("/accounts", response_model=BankAccountOut, status_code=status.HTTP_201_CREATED)
 def add_bank_account(
     bank_data: BankAccountCreate,
     db: Session = Depends(get_db),
@@ -298,7 +301,7 @@ def add_bank_account(
 # -------------------
 # 3️⃣ Get specific bank account
 # -------------------
-@router.get("/bank-accounts/{account_id}", response_model=BankAccountOut)
+@router.get("/accounts/{account_id}", response_model=BankAccountOut)
 def get_bank_account(
     account_id: int,
     db: Session = Depends(get_db),
@@ -319,7 +322,7 @@ def get_bank_account(
 # -------------------
 # 4️⃣ Update bank account
 # -------------------
-@router.put("/bank-accounts/{account_id}", response_model=BankAccountOut)
+@router.put("/accounts/{account_id}", response_model=BankAccountOut)
 def update_bank_account(
     account_id: int,
     update_data: BankAccountUpdate,
@@ -350,7 +353,7 @@ def update_bank_account(
 # -------------------
 # 5️⃣ Delete bank account
 # -------------------
-@router.delete("/bank-accounts/{account_id}", status_code=status.HTTP_200_OK)
+@router.delete("/accounts/{account_id}", status_code=status.HTTP_200_OK)
 def delete_bank_account(
     account_id: int,
     db: Session = Depends(get_db),
@@ -380,7 +383,7 @@ def delete_bank_account(
 # -------------------
 # 6️⃣ Set bank account as primary
 # -------------------
-@router.patch("/bank-accounts/{account_id}/set-primary", response_model=BankAccountOut)
+@router.patch("/accounts/{account_id}/set-primary", response_model=BankAccountOut)
 def set_primary_bank_account(
     account_id: int,
     db: Session = Depends(get_db),
@@ -410,7 +413,7 @@ def set_primary_bank_account(
 # -------------------
 # 7️⃣ Upload bank document
 # -------------------
-@router.post("/bank-accounts/{account_id}/upload-document", response_model=BankAccountOut)
+@router.post("/accounts/{account_id}/upload-document", response_model=BankAccountOut)
 async def upload_bank_document(
     account_id: int,
     bank_doc_type: str = Form(..., description="Type: passbook, cancelled_cheque, bank_statement"),
@@ -486,7 +489,7 @@ async def upload_bank_document(
 # -------------------
 # 8️⃣ Get all pending bank accounts (ADMIN)
 # -------------------
-@router.get("/admin/bank-accounts/pending", response_model=List[BankAccountOut], tags=["admin-bank-verification"])
+@router.get("/admin/accounts/pending", response_model=List[BankAccountOut], tags=["admin-bank-verification"])
 def admin_get_pending_bank_accounts(
     db: Session = Depends(get_db),
     # current_admin = Depends(get_current_admin)  # Add admin auth
@@ -514,7 +517,7 @@ def admin_get_pending_bank_accounts(
 # -------------------
 # 9️⃣ Get all bank accounts with filters (ADMIN)
 # -------------------
-@router.get("/admin/bank-accounts", response_model=List[BankAccountOut], tags=["admin-bank-verification"])
+@router.get("/admin/accounts", response_model=List[BankAccountOut], tags=["admin-bank-verification"])
 def admin_get_all_bank_accounts(
     vendor_id: Optional[int] = None,
     is_verified: Optional[bool] = None,
@@ -551,7 +554,7 @@ def admin_get_all_bank_accounts(
 # -------------------
 # 🔟 Get specific bank account details (ADMIN)
 # -------------------
-@router.get("/admin/bank-accounts/{account_id}", response_model=BankAccountOut, tags=["admin-bank-verification"])
+@router.get("/admin/accounts/{account_id}", response_model=BankAccountOut, tags=["admin-bank-verification"])
 def admin_get_bank_account_details(
     account_id: int,
     db: Session = Depends(get_db),
@@ -576,7 +579,7 @@ def admin_get_bank_account_details(
 # -------------------
 # 1️⃣1️⃣ Verify/Reject bank account (ADMIN)
 # -------------------
-@router.patch("/admin/bank-accounts/{account_id}/verify", response_model=BankAccountOut, tags=["admin-bank-verification"])
+@router.patch("/admin/accounts/{account_id}/verify", response_model=BankAccountOut, tags=["admin-bank-verification"])
 def admin_verify_bank_account(
     account_id: int,
     verification_data: BankVerificationRequest,
@@ -618,7 +621,7 @@ def admin_verify_bank_account(
 # -------------------
 # 1️⃣2️⃣ Get verification statistics (ADMIN)
 # -------------------
-@router.get("/admin/bank-accounts/stats/verification", tags=["admin-bank-verification"])
+@router.get("/admin/accounts/stats/verification", tags=["admin-bank-verification"])
 def admin_get_verification_stats(
     db: Session = Depends(get_db),
     # current_admin = Depends(get_current_admin)
