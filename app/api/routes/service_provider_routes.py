@@ -1,6 +1,6 @@
 
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body,status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.models.service_provider_model import ServiceProvider
@@ -249,34 +249,54 @@ from app.schemas.service_provider_schema import BankAccountCreate, BankAccountUp
 
 # ==================== BANK ACCOUNT ROUTES ====================
 
+
 @router.get("/bank-accounts", response_model=List[BankAccountOut])
 def get_my_bank_accounts(
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
-    """Vendor ke saare bank accounts fetch karo"""
+    """
+    Fetch all bank accounts for the currently authenticated vendor.
+    """
     try:
         accounts = vendor_bank_crud.get_vendor_bank_accounts(db, current_vendor.id)
         return accounts
     except Exception as e:
-        logger.error(f"Error fetching bank accounts: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch bank accounts")
+        logger.error(f"[BankAccount] Error fetching bank accounts for vendor {current_vendor.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch bank accounts. Please try again later."
+        )
 
 
-@router.post("/bank-accounts", response_model=BankAccountOut)
+@router.post("/bank-accounts", response_model=BankAccountOut, status_code=status.HTTP_201_CREATED)
 def add_bank_account(
     bank_data: BankAccountCreate,
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
-    """Naya bank account add karo"""
+    """
+    Add a new bank account for the currently authenticated vendor.
+    """
     try:
+        # Check for existing duplicate accounts if needed
+        existing_accounts = vendor_bank_crud.get_vendor_bank_accounts(db, current_vendor.id)
+        if any(acc.account_number == bank_data.account_number for acc in existing_accounts):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bank account with this number already exists."
+            )
+
         account = vendor_bank_crud.create_bank_account(db, current_vendor.id, bank_data)
         return account
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error creating bank account: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create bank account")
-
+        logger.error(f"[BankAccount] Error creating bank account for vendor {current_vendor.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create bank account. Please try again later."
+        )
 
 @router.get("/bank-accounts/{account_id}", response_model=BankAccountOut)
 def get_bank_account(
