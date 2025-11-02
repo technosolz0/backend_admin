@@ -137,3 +137,8 @@ class ServiceProvider(Base):
         secondary="vendor_subcategory_charges",
         viewonly=True
     )
+    bank_accounts = relationship(
+        "VendorBankAccount",
+        back_populates="vendor",
+        cascade="all, delete-orphan"
+    )

@@ -459,7 +459,7 @@ def get_payment(
         logger.error(f"Booking not found: {booking_id}")
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    # Authorization check
+    # Authorization check``
     is_authorized = False
     
     if isinstance(identity, User):
