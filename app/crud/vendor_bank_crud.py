@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 def get_vendor_bank_accounts(db: Session, vendor_id: int) -> List[VendorBankAccount]:
     """Vendor ke saare bank accounts fetch karo"""
+    print('vendor ###########################################',vendor_id)
     return db.query(VendorBankAccount).filter(
         VendorBankAccount.vendor_id == vendor_id
     ).order_by(

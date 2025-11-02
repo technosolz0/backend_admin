@@ -193,7 +193,9 @@ def get_my_bank_accounts(
     Fetch all bank accounts for the currently authenticated vendor.
     """
     try:
+        print("before---------------------------------------",accounts)
         accounts = vendor_bank_crud.get_vendor_bank_accounts(db, current_vendor.id)
+        print("hello---------------------------------------",accounts)
         return accounts
     except Exception as e:
         logger.error(f"[BankAccount] Error fetching bank accounts for vendor {current_vendor.id}: {str(e)}")
