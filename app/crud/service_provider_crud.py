@@ -24,7 +24,8 @@ from app.schemas.service_provider_schema import BankAccountOut
 from app.schemas.sub_category_schema import SubCategoryStatus
 from app.utils.fcm import send_notification, NotificationType
 import logging
-from typing import List, Tuple
+# from typing import List, Tuple
+from typing import List, Dict, Any, Optional
 import os
 from pathlib import Path
 
