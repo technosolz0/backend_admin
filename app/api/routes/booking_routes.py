@@ -14,7 +14,7 @@ from app.core.security import get_current_admin, get_db, get_current_user, get_c
 from app.schemas.booking_schema import BookingCreate, BookingOut, BookingStatusUpdate
 from app.schemas.payment_schema import PaymentCreate, PaymentOut
 from app.crud import booking_crud, payment_crud, category, subcategory, user as user_crud, service_provider_crud as vendor_crud
-from app.models.booking_model import BookingStatus
+from app.models.booking_model import Booking, BookingStatus
 from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
 from app.utils.fcm import send_notification
