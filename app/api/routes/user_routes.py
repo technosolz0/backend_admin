@@ -688,21 +688,53 @@ def protected_admin_route():
 
 
 @router.get("/", response_model=dict, dependencies=[Depends(get_super_admin)])
-def list_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    """List all users (super admin only)."""
-    result = crud_user.get_users(db, skip, limit)
-    
-    if not result["success"]:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=result["message"]
+def list_users(
+    search: str = None,
+    status_filter: str = None,
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """List all users with search and filter capabilities (super admin only)."""
+    from sqlalchemy import or_, and_
+
+    # Build query
+    query = db.query(User)
+
+    # Apply filters
+    if status_filter:
+        query = query.filter(User.status == status_filter)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.name.ilike(search_term),
+                User.email.ilike(search_term),
+                User.mobile.ilike(search_term)
+            )
         )
-    
-    logger.info(f"Retrieved {len(result['data'])} users with skip={skip}, limit={limit}")
+
+    # Get total count for pagination
+    total = query.count()
+
+    # Apply pagination
+    users = query.offset(skip).limit(limit).all()
+
+    logger.info(f"Retrieved {len(users)} users with search='{search}', status='{status_filter}', skip={skip}, limit={limit}")
+
     return {
         "success": True,
-        "message": result["message"],
-        "users": [user_schema.UserOut.from_orm(user) for user in result["data"]]
+        "message": f"Retrieved {len(users)} users",
+        "users": [user_schema.UserOut.from_orm(user) for user in users],
+        "total": total,
+        "page": (skip // limit) + 1,
+        "limit": limit,
+        "total_pages": (total + limit - 1) // limit,
+        "filters_applied": {
+            "search": search,
+            "status": status_filter
+        }
     }
 
 

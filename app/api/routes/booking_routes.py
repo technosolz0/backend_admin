@@ -139,27 +139,69 @@ def get_all_bookings_admin(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin),
     status: Optional[BookingStatus] = Query(None),
+    user_id: Optional[int] = Query(None),
+    vendor_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100)
 ):
-    """Admin endpoint to get all bookings in the system with pagination"""
+    """Admin endpoint to get all bookings in the system with advanced filtering and search"""
     skip = (page - 1) * limit
 
+    # Build query with filters
+    query = db.query(Booking)
+
+    # Apply filters
     if status:
-        bookings = booking_crud.get_bookings_by_status(db, status, skip, limit)
-        # For filtered results, we need to count total with filter
-        total_query = db.query(Booking).filter(Booking.status == status)
-        total = total_query.count()
-    else:
-        bookings = booking_crud.get_all_bookings(db, skip, limit)
-        total = db.query(Booking).count()
+        query = query.filter(Booking.status == status)
+    if user_id:
+        query = query.filter(Booking.user_id == user_id)
+    if vendor_id:
+        query = query.filter(Booking.serviceprovider_id == vendor_id)
+
+    # Apply search (search in user names, addresses, etc.)
+    if search:
+        from sqlalchemy import or_
+        # Get user IDs that match the search
+        user_ids = db.query(User.id).filter(
+            or_(
+                User.name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%")
+            )
+        ).subquery()
+
+        # Get vendor IDs that match the search
+        vendor_ids = db.query(Vendor.id).filter(
+            Vendor.name.ilike(f"%{search}%")
+        ).subquery()
+
+        query = query.filter(
+            or_(
+                Booking.user_id.in_(user_ids),
+                Booking.serviceprovider_id.in_(vendor_ids),
+                Booking.address.ilike(f"%{search}%"),
+                Booking.id == search  # Allow searching by booking ID
+            )
+        )
+
+    # Get total count for pagination
+    total = query.count()
+
+    # Apply pagination and get results
+    bookings = query.offset(skip).limit(limit).all()
 
     return {
         "bookings": [enrich_booking(db, b) for b in bookings],
         "total": total,
         "page": page,
         "limit": limit,
-        "total_pages": (total + limit - 1) // limit  # Ceiling division
+        "total_pages": (total + limit - 1) // limit,  # Ceiling division
+        "filters_applied": {
+            "status": status.value if status else None,
+            "user_id": user_id,
+            "vendor_id": vendor_id,
+            "search": search
+        }
     }
 
 @router.get("/{booking_id}", response_model=dict)
@@ -172,22 +214,17 @@ def get_booking(
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    # Check based on identity type
-    if hasattr(identity, 'id') and hasattr(identity, 'email'):  # Valid identity
-        if identity.id == booking.user_id:  # User or Vendor ID match
-            return enrich_booking(db, booking)
-        
+    # Check if user is admin (allow access to all bookings)
+    if isinstance(identity, User) and hasattr(identity, 'is_superuser') and identity.is_superuser:
+        return enrich_booking(db, booking)
 
-        if isinstance(identity, User) and identity.id == booking.user_id:
-            return enrich_booking(db, booking)
-        
-        # Vendor access
-        elif isinstance(identity, Vendor) and identity.id == booking.serviceprovider_id:
-            return enrich_booking(db, booking)
-        else:
-            raise HTTPException(status_code=403, detail="Unauthorized access to this booking")
+    # Check based on identity type for regular users/vendors
+    if isinstance(identity, User) and identity.id == booking.user_id:
+        return enrich_booking(db, booking)
+    elif isinstance(identity, Vendor) and identity.id == booking.serviceprovider_id:
+        return enrich_booking(db, booking)
     else:
-        raise HTTPException(status_code=401, detail="Invalid or missing authentication token")
+        raise HTTPException(status_code=403, detail="Unauthorized access to this booking")
 
 @router.patch("/{booking_id}/status", response_model=dict)
 def update_booking_status(
