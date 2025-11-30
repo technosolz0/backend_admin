@@ -134,20 +134,33 @@ def get_all_bookings(
         bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
     return [enrich_booking(db, b) for b in bookings]
 
-@router.get("/admin/all", response_model=List[dict])
+@router.get("/admin/all", response_model=dict)
 def get_all_bookings_admin(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin),
     status: Optional[BookingStatus] = Query(None),
-    skip: int = Query(0, ge=0),
+    page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100)
 ):
-    """Admin endpoint to get all bookings in the system"""
+    """Admin endpoint to get all bookings in the system with pagination"""
+    skip = (page - 1) * limit
+
     if status:
         bookings = booking_crud.get_bookings_by_status(db, status, skip, limit)
+        # For filtered results, we need to count total with filter
+        total_query = db.query(Booking).filter(Booking.status == status)
+        total = total_query.count()
     else:
         bookings = booking_crud.get_all_bookings(db, skip, limit)
-    return [enrich_booking(db, b) for b in bookings]
+        total = db.query(Booking).count()
+
+    return {
+        "bookings": [enrich_booking(db, b) for b in bookings],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total + limit - 1) // limit  # Ceiling division
+    }
 
 @router.get("/{booking_id}", response_model=dict)
 def get_booking(
