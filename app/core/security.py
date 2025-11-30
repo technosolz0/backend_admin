@@ -91,6 +91,15 @@ def get_current_identity(
             print(f"Vendor not found for email: {email}")
             raise credentials_exception
         return vendor
+    elif role == 'admin':
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            print(f"Admin user not found for email: {email}")
+            raise credentials_exception
+        if not user.is_superuser:
+            print(f"User {email} is not a superuser")
+            raise credentials_exception
+        return user
     else:  # default to user (role == 'user' or None)
         user = db.query(User).filter(User.email == email).first()
         if user is None:
@@ -131,11 +140,40 @@ def get_current_admin(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    identity = get_current_identity(token=token, db=db)
-    if not isinstance(identity, User) or not identity.is_superuser:
+    """
+    Get current admin user. Requires admin role in JWT token.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate admin credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        role: str = payload.get("role")
+
+        if email is None:
+            raise credentials_exception
+
+        if role != 'admin':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    except JWTError as e:
+        print(f"JWT decode error: {str(e)}")
+        raise credentials_exception
+
+    # Fetch admin user
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return identity
+    return user

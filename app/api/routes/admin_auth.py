@@ -31,11 +31,11 @@ def admin_login(credentials: AdminLoginSchema, db: Session = Depends(get_db)):
 
     if not admin or not verify_password(credentials.password, admin.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not admin.is_superuser:
         raise HTTPException(status_code=403, detail="You are not authorized as an admin")
 
-    token = create_access_token(data={"sub": admin.email})
+    token = create_access_token(data={"sub": admin.email}, role="admin")
     return {
         "access_token": token,
         "token_type": "bearer",
