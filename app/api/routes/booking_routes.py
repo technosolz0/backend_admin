@@ -1,197 +1,4 @@
 
-# from typing import List, Optional, Union
-# from fastapi import APIRouter, Depends, HTTPException, Query
-# from sqlalchemy.orm import Session
-# from datetime import datetime, date
-# from enum import Enum
-# import logging
-# import jwt
-# from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-# from app.core.security import get_db, get_current_user, get_current_vendor, SECRET_KEY, ALGORITHM
-# from app.schemas.booking_schema import BookingCreate, BookingOut, BookingStatusUpdate
-# from app.schemas.payment_schema import PaymentCreate, PaymentOut
-# from app.crud import booking_crud, payment_crud, category, subcategory, user as user_crud, service_provider_crud
-# from app.models.booking_model import BookingStatus
-# from app.models.user import User
-# from app.models.service_provider_model import ServiceProvider as Vendor
-# from app.utils.fcm import send_notification
-
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-# router = APIRouter(prefix="/bookings", tags=["Booking"])
-
-# security = HTTPBearer()
-
-# def get_current_identity(db: Session = Depends(get_db), credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[Union[dict, None]]:
-#     """
-#     Unified dependency to get either user or vendor identity from token.
-#     Returns {'type': 'user' or 'vendor', 'id': id, 'email': email, ...} or None if invalid.
-#     Does not raise exceptions; returns None on failure.
-#     """
-#     try:
-#         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-#         role = payload.get('role')  # 'role' distinguishes user ('None') from vendor ('vendor')
-#         email = payload.get('sub')  # 'sub' contains email
-#         if not email:
-#             return None
-
-#         # Fetch full details from DB
-#         if role == 'vendor':
-#             vendor = service_provider_crud.get_vendor_by_email(db, email)
-#             if vendor:
-#                 return {
-#                     'type': 'vendor',
-#                     'id': vendor.id,
-#                     'email': vendor.email,
-#                     'new_fcm_token': vendor.new_fcm_token,
-#                     'old_fcm_token': vendor.old_fcm_token
-#                 }
-#         else:
-#             # Assume user if no role or role != 'vendor'
-#             user = user_crud.get_user_by_email(db, email)
-#             if user:
-#                 return {
-#                     'type': 'user',
-#                     'id': user.id,
-#                     'email': user.email,
-#                     'new_fcm_token': user.new_fcm_token,
-#                     'old_fcm_token': user.old_fcm_token
-#                 }
-
-#         return None
-#     except Exception as e:
-#         logger.warning(f"Token validation failed: {e}")
-#         return None
-
-# class NotificationType(str, Enum):
-#     booking_created = "booking_created"
-#     booking_accepted = "booking_accepted"
-#     booking_cancelled = "booking_cancelled"
-#     booking_completed = "booking_completed"
-#     otp_sent = "otp_sent"
-#     payment_created = "payment_created"
-
-# def send_booking_notification(
-#     db: Session,
-#     booking,
-#     notification_type: NotificationType,
-#     recipient: str,
-#     recipient_id: int,
-#     fcm_token: Optional[str] = None
-# ):
-#     """Helper function to send standardized booking notifications."""
-#     messages = {
-#         NotificationType.booking_created: f"Your booking #{booking.id} has been created successfully.",
-#         NotificationType.booking_accepted: f"Your booking #{booking.id} has been accepted by the vendor.",
-#         NotificationType.booking_cancelled: f"Your booking #{booking.id} has been cancelled.",
-#         NotificationType.booking_completed: f"Your booking #{booking.id} has been completed.",
-#         NotificationType.otp_sent: f"An OTP for booking #{booking.id} completion has been sent to your email.",
-#         NotificationType.payment_created: f"Payment for booking #{booking.id} has been created."
-#     }
-    
-#     message = messages.get(notification_type, f"Booking #{booking.id} status updated to {notification_type.value}.")
-    
-#     try:
-#         send_notification(
-#             recipient=recipient,
-#             notification_type=notification_type,
-#             message=message,
-#             recipient_id=recipient_id,
-#             fcm_token=fcm_token
-#         )
-#         logger.info(f"Notification sent: {notification_type} to {recipient} for booking {booking.id}")
-#     except Exception as e:
-#         logger.error(f"Failed to send notification {notification_type} to {recipient}: {str(e)}")
-
-# def enrich_booking(db: Session, booking) -> dict:
-#     """Attach user name, category/subcategory names, and service name to booking output."""
-#     cat = category.get_category_by_id(db, booking.category_id)
-#     subcat = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
-#     user = db.query(User).filter(User.id == booking.user_id).first()
-    
-#     booking_dict = {
-#         "id": booking.id,
-#         "user_id": booking.user_id,
-#         "serviceprovider_id": booking.serviceprovider_id,
-#         "category_id": booking.category_id,
-#         "subcategory_id": booking.subcategory_id,
-#         "status": booking.status,
-#         "scheduled_time": booking.scheduled_time.isoformat() if booking.scheduled_time else None,
-#         "address": booking.address,
-#         "otp": booking.otp,
-#         "created_at": booking.created_at.isoformat() if booking.created_at else None,
-#         "user_name": user.name if user else "Unknown User",
-#         "category_name": cat.name if cat else None,
-#         "subcategory_name": subcat.name if subcat else None,
-#         "service_name": subcat.name if subcat else None,
-#     }
-    
-#     return booking_dict
-
-# @router.post("/", response_model=dict)
-# def create_booking(
-#     booking: BookingCreate,
-#     db: Session = Depends(get_db),
-#     current_user=Depends(get_current_user)
-# ):
-#     if booking.user_id != current_user.id:
-#         logger.warning(f"Unauthorized attempt to create booking for user_id {booking.user_id} by user {current_user.id}")
-#         raise HTTPException(status_code=403, detail="You can't create booking for another user.")
-
-#     booking_result = booking_crud.create_booking(db, booking)
-#     logger.info(f"Booking created successfully: ID {booking_result.id}")
-
-#     user_fcm_token = current_user.new_fcm_token or current_user.old_fcm_token
-#     send_booking_notification(
-#         db, booking_result, NotificationType.booking_created,
-#         recipient=current_user.email, recipient_id=current_user.id, fcm_token=user_fcm_token
-#     )
-    
-#     vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking_result.serviceprovider_id)
-#     if vendor:
-#         vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
-#         send_booking_notification(
-#             db, booking_result, NotificationType.booking_created, 
-#             recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
-#         )
-
-#     return enrich_booking(db, booking_result)
-
-# @router.get("/", response_model=List[dict])
-# def get_all_bookings(
-#     db: Session = Depends(get_db),
-#     user=Depends(get_current_user),
-#     status: Optional[BookingStatus] = Query(None),
-#     skip: int = Query(0, ge=0),
-#     limit: int = Query(10, ge=1, le=100)
-# ):
-#     if status:
-#         bookings = booking_crud.get_bookings_by_user_and_status(db, user.id, status, skip, limit)
-#     else:
-#         bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
-#     return [enrich_booking(db, b) for b in bookings]
-
-# @router.get("/{booking_id}", response_model=dict)
-# def get_booking(
-#     booking_id: int,
-#     db: Session = Depends(get_db),
-#     identity: Optional[dict] = Depends(get_current_identity),
-# ):
-#     booking = booking_crud.get_booking_by_id(db, booking_id)
-#     if not booking:
-#         raise HTTPException(status_code=404, detail="Booking not found")
-
-#     if not identity:
-#         raise HTTPException(status_code=401, detail="Invalid or missing authentication token")
-
-#     if identity['type'] == 'user' and booking.user_id == identity['id']:
-#         return enrich_booking(db, booking)
-#     elif identity['type'] == 'vendor' and booking.serviceprovider_id == identity['id']:
-#         return enrich_booking(db, booking)
-#     else:
-#         raise HTTPException(status_code=403, detail="Unauthorized access to this booking")
-
 
 # app/api/routes/booking_routes.py - Updated get_current_identity to use role/sub
 from typing import List, Optional, Union
@@ -203,7 +10,7 @@ import logging
 import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.core.security import get_db, get_current_user, get_current_vendor, SECRET_KEY, ALGORITHM, get_current_identity  # Use unified
+from app.core.security import get_current_admin, get_db, get_current_user, get_current_vendor, SECRET_KEY, ALGORITHM, get_current_identity  # Use unified
 from app.schemas.booking_schema import BookingCreate, BookingOut, BookingStatusUpdate
 from app.schemas.payment_schema import PaymentCreate, PaymentOut
 from app.crud import booking_crud, payment_crud, category, subcategory, user as user_crud, service_provider_crud as vendor_crud
@@ -325,6 +132,21 @@ def get_all_bookings(
         bookings = booking_crud.get_bookings_by_user_and_status(db, user.id, status, skip, limit)
     else:
         bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
+    return [enrich_booking(db, b) for b in bookings]
+
+@router.get("/admin/all", response_model=List[dict])
+def get_all_bookings_admin(
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+    status: Optional[BookingStatus] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100)
+):
+    """Admin endpoint to get all bookings in the system"""
+    if status:
+        bookings = booking_crud.get_bookings_by_status(db, status, skip, limit)
+    else:
+        bookings = booking_crud.get_all_bookings(db, skip, limit)
     return [enrich_booking(db, b) for b in bookings]
 
 @router.get("/{booking_id}", response_model=dict)

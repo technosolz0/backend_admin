@@ -126,5 +126,16 @@ def get_current_vendor(
         )
     return identity
 
-
-
+# Admin: get_current_admin (for admin-only routes)
+def get_current_admin(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    identity = get_current_identity(token=token, db=db)
+    if not isinstance(identity, User) or not identity.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return identity
