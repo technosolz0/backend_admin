@@ -37,33 +37,39 @@ MAX_OTP_ATTEMPTS = 3
 MAX_OTP_RESENDS = 3
 OTP_RESEND_COOLDOWN_MINUTES = 1
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+# def verify_password(plain_password: str, hashed_password: str) -> bool:
+#     return pwd_context.verify(plain_password, hashed_password)
 
-def get_vendor_by_email(db: Session, email: str) -> ServiceProvider:
-    return db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
+# def get_vendor_by_email(db: Session, email: str) -> ServiceProvider:
+#     return db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
 
-def get_vendor_by_id(db: Session, vendor_id: int) -> ServiceProvider:
-    return db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+# def get_vendor_by_id(db: Session, vendor_id: int) -> ServiceProvider:
+#     return db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
 
-def get_subcategory_by_id(db: Session, subcategory_id: int) -> SubCategory:
-    return db.query(SubCategory).filter(SubCategory.id == subcategory_id).first()
+# def get_subcategory_by_id(db: Session, subcategory_id: int) -> SubCategory:
+#     return db.query(SubCategory).filter(SubCategory.id == subcategory_id).first()
 
-def get_category_by_id(db: Session, category_id: int) -> Category:
-    return db.query(Category).filter(Category.id == category_id).first()
+# def get_category_by_id(db: Session, category_id: int) -> Category:
+#     return db.query(Category).filter(Category.id == category_id).first()
 
-def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryCharge]:
-    charges = db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).all()
-    return [
-        SubCategoryCharge(
-            subcategory_id=charge.subcategory_id,
-            subcategory_name=get_subcategory_by_id(db, charge.subcategory_id).name if get_subcategory_by_id(db, charge.subcategory_id) else None,
-            service_charge=charge.service_charge
-        )
-        for charge in charges
-    ]
+# def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryCharge]:
+#     charges = db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).all()
+#     return [
+#         SubCategoryCharge(
+#             subcategory_id=charge.subcategory_id,
+#             subcategory_name=get_subcategory_by_id(db, charge.subcategory_id).name if get_subcategory_by_id(db, charge.subcategory_id) else None,
+#             service_charge=charge.service_charge
+#         )
+#         for charge in charges
+#     ]
 
+# # Add this import at top
+# from app.models.vendor_bank_account_model import VendorBankAccount
+
+# # Update build_vendor_response function
 # def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorResponse:
+#     """Build vendor response with all details"""
+    
 #     # Get Category Name
 #     category_name = None
 #     if vendor.category_id:
@@ -72,7 +78,18 @@ def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryC
 
 #     # Get SubCategory Names + Charges
 #     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-       
+    
+#     # ✅ Get bank accounts
+#     from app.schemas.service_provider_schema import BankAccountOut
+#     bank_accounts = db.query(VendorBankAccount).filter(
+#         VendorBankAccount.vendor_id == vendor.id
+#     ).order_by(
+#         VendorBankAccount.is_primary.desc(),
+#         VendorBankAccount.created_at.desc()
+#     ).all()
+    
+#     bank_accounts_out = [BankAccountOut.from_orm(ba) for ba in bank_accounts]
+
 #     return VendorResponse(
 #         id=vendor.id,
 #         full_name=vendor.full_name,
@@ -102,20 +119,66 @@ def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryC
 #         status=vendor.status,
 #         admin_status=vendor.admin_status,
 #         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges
-#         bank_accounts=bank_accounts_out
+#         subcategory_charges=subcategory_charges,
+#         bank_accounts=bank_accounts_out  # ✅ Add this
 #     )
 
 
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash."""
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        logger.error(f"Password verification error: {str(e)}")
+        return False
 
-# app/crud/service_provider_crud.py
 
-# Add this import at top
-from app.models.vendor_bank_account_model import VendorBankAccount
+def get_vendor_by_email(db: Session, email: str) -> ServiceProvider:
+    """Get vendor by email."""
+    try:
+        return db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching vendor by email: {str(e)}")
+        return None
 
-# Update build_vendor_response function
+
+def get_vendor_by_id(db: Session, vendor_id: int) -> ServiceProvider:
+    """Get vendor by ID."""
+    try:
+        return db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching vendor by ID: {str(e)}")
+        return None
+
+
+def get_subcategory_by_id(db: Session, subcategory_id: int) -> SubCategory:
+    """Get subcategory by ID."""
+    return db.query(SubCategory).filter(SubCategory.id == subcategory_id).first()
+
+
+def get_category_by_id(db: Session, category_id: int) -> Category:
+    """Get category by ID."""
+    return db.query(Category).filter(Category.id == category_id).first()
+
+
+def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryCharge]:
+    """Attach subcategory charges for vendor."""
+    charges = db.query(VendorSubcategoryCharge).filter(
+        VendorSubcategoryCharge.vendor_id == vendor_id
+    ).all()
+    return [
+        SubCategoryCharge(
+            subcategory_id=charge.subcategory_id,
+            subcategory_name=get_subcategory_by_id(db, charge.subcategory_id).name 
+                if get_subcategory_by_id(db, charge.subcategory_id) else None,
+            service_charge=charge.service_charge
+        )
+        for charge in charges
+    ]
+
+
 def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorResponse:
-    """Build vendor response with all details"""
+    """Build vendor response with all details."""
     
     # Get Category Name
     category_name = None
@@ -126,8 +189,7 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
     # Get SubCategory Names + Charges
     subcategory_charges = attach_subcategory_charges(db, vendor.id)
     
-    # ✅ Get bank accounts
-    from app.schemas.service_provider_schema import BankAccountOut
+    # Get bank accounts
     bank_accounts = db.query(VendorBankAccount).filter(
         VendorBankAccount.vendor_id == vendor.id
     ).order_by(
@@ -167,11 +229,132 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         admin_status=vendor.admin_status,
         work_status=vendor.work_status,
         subcategory_charges=subcategory_charges,
-        bank_accounts=bank_accounts_out  # ✅ Add this
+        bank_accounts=bank_accounts_out
     )
 
 
+# =================== VENDOR REGISTRATION ===================
+
+def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
+    """
+    Create a new vendor and send OTP.
+    Returns dict with success status and message.
+    """
+    try:
+        # Check if vendor already exists
+        existing = get_vendor_by_email(db, email=vendor.email)
+        
+        if existing and existing.otp_verified:
+            logger.warning(f"Vendor registration attempt with existing verified email: {vendor.email}")
+            return {
+                "success": False,
+                "message": "This email is already registered. Please login instead.",
+                "data": None
+            }
+        
+        # Update existing unverified vendor
+        if existing and not existing.otp_verified:
+            logger.info(f"Updating existing unverified vendor: {vendor.email}")
+            existing.full_name = vendor.full_name
+            existing.phone = vendor.phone
+            existing.password = get_password_hash(vendor.password)
+            existing.terms_accepted = vendor.terms_accepted
+            existing.identity_doc_type = vendor.identity_doc_type
+            existing.identity_doc_number = vendor.identity_doc_number
+            existing.new_fcm_token = vendor.new_fcm_token
+            existing.old_fcm_token = vendor.old_fcm_token
+            existing.latitude = vendor.latitude
+            existing.longitude = vendor.longitude
+            existing.device_name = vendor.device_name
+            existing.step = 0
+            existing.otp = generate_otp()
+            existing.otp_created_at = datetime.utcnow()
+            existing.otp_last_sent_at = datetime.utcnow()
+            existing.otp_attempts = 0
+            db.commit()
+            db.refresh(existing)
+            
+            # Send OTP
+            try:
+                send_email(vendor.email, existing.otp, template="otp")
+                logger.info(f"OTP sent to existing unverified vendor: {vendor.email}")
+            except Exception as e:
+                logger.error(f"Failed to send OTP to {vendor.email}: {str(e)}")
+            
+            return {
+                "success": True,
+                "message": "OTP sent to your email. Please verify to complete registration.",
+                "data": {"vendor_id": existing.id, "step": existing.step}
+            }
+        
+        # Create new vendor
+        logger.info(f"Creating new vendor: {vendor.email}")
+        hashed_password = get_password_hash(vendor.password)
+        otp = generate_otp()
+        now = datetime.utcnow()
+        
+        db_vendor = ServiceProvider(
+            full_name=vendor.full_name,
+            email=vendor.email,
+            phone=vendor.phone,
+            password=hashed_password,
+            terms_accepted=vendor.terms_accepted,
+            identity_doc_type=vendor.identity_doc_type,
+            identity_doc_number=vendor.identity_doc_number,
+            new_fcm_token=vendor.new_fcm_token,
+            old_fcm_token=vendor.old_fcm_token,
+            latitude=vendor.latitude,
+            longitude=vendor.longitude,
+            device_name=vendor.device_name,
+            step=0,
+            otp=otp,
+            otp_created_at=now,
+            otp_last_sent_at=now,
+            otp_verified=False,
+            otp_attempts=0,
+            last_login=now,
+            last_device_update=now,
+            status='pending',
+            admin_status='inactive',
+            work_status='work_on'
+        )
+        db.add(db_vendor)
+        db.commit()
+        db.refresh(db_vendor)
+        
+        # Send OTP
+        try:
+            send_email(vendor.email, otp, template="otp")
+            logger.info(f"OTP sent to new vendor: {vendor.email}")
+        except Exception as e:
+            logger.error(f"Failed to send OTP to {vendor.email}: {str(e)}")
+        
+        return {
+            "success": True,
+            "message": "Registration successful! OTP sent to your email. Please verify to continue.",
+            "data": {"vendor_id": db_vendor.id, "step": db_vendor.step}
+        }
+    
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in create_vendor: {str(e)}")
+        return {
+            "success": False,
+            "message": "Database error occurred. Please try again later.",
+            "data": None
+        }
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Unexpected error in create_vendor: {str(e)}")
+        return {
+            "success": False,
+            "message": f"An error occurred: {str(e)}",
+            "data": None
+        }
+
+
 def get_all_vendors(db: Session, page: int = 1, limit: int = 10):
+    """Get all vendors with pagination."""
     try:
         offset = (page - 1) * limit
         query = (
@@ -194,7 +377,9 @@ def get_all_vendors(db: Session, page: int = 1, limit: int = 10):
         logger.error(f"Error fetching vendors: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 def delete_vendor(db: Session, vendor_id: int) -> None:
+    """Delete vendor by ID."""
     vendor = get_vendor_by_id(db, vendor_id)
     if not vendor:
         logger.error(f"Vendor not found for ID {vendor_id}")
@@ -209,153 +394,464 @@ def delete_vendor(db: Session, vendor_id: int) -> None:
         db.rollback()
         logger.error(f"Database error in delete_vendor: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+
+# def get_all_vendors(db: Session, page: int = 1, limit: int = 10):
+#     try:
+#         offset = (page - 1) * limit
+#         query = (
+#             db.query(ServiceProvider)
+#             .options(
+#                 joinedload(ServiceProvider.category),
+#                 joinedload(ServiceProvider.subcategory_charges).joinedload(VendorSubcategoryCharge.subcategory)
+#             )
+#         )
+
+#         total = query.count()
+#         vendors = query.offset(offset).limit(limit).all()
+
+#         vendor_responses = []
+#         for vendor in vendors:
+#             vendor_responses.append(build_vendor_response(db, vendor))
+
+#         return vendor_responses, total
+#     except Exception as e:
+#         logger.error(f"Error fetching vendors: {str(e)}")
+#         raise HTTPException(status_code=500, detail="Internal server error")
+
+# def delete_vendor(db: Session, vendor_id: int) -> None:
+#     vendor = get_vendor_by_id(db, vendor_id)
+#     if not vendor:
+#         logger.error(f"Vendor not found for ID {vendor_id}")
+#         raise HTTPException(status_code=404, detail="Vendor not found")
+    
+#     try:
+#         db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).delete()
+#         db.delete(vendor)
+#         db.commit()
+#         logger.info(f"Vendor deleted successfully: ID {vendor_id}")
+#     except SQLAlchemyError as e:
+#         db.rollback()
+#         logger.error(f"Database error in delete_vendor: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Unexpected error in delete_vendor: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+# def vendor_login(db: Session, email: str, password: str) -> Tuple[VendorResponse, str]:
+#     vendor = get_vendor_by_email(db, email)
+#     if not vendor:
+#         raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+#     if not vendor.otp_verified:
+#         raise HTTPException(status_code=403, detail="OTP verification required")
+    
+#     if not verify_password(password, vendor.password):
+#         raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+#     vendor.last_login = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+    
+#     vendor_response = build_vendor_response(db, vendor)
+#     return vendor_response, "Login successful"
+
+# def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
+#     existing = get_vendor_by_email(db, email=vendor.email)
+#     if existing and existing.otp_verified:
+#         raise HTTPException(status_code=400, detail="Email already registered")
+    
+#     if existing and not existing.otp_verified:
+#         existing.full_name = vendor.full_name
+#         existing.phone = vendor.phone
+#         existing.password = get_password_hash(vendor.password)
+#         existing.terms_accepted = vendor.terms_accepted
+#         existing.identity_doc_type = vendor.identity_doc_type
+#         existing.identity_doc_number = vendor.identity_doc_number
+#         existing.new_fcm_token = vendor.new_fcm_token
+#         existing.old_fcm_token = vendor.old_fcm_token
+#         existing.latitude = vendor.latitude
+#         existing.longitude = vendor.longitude
+#         existing.device_name = vendor.device_name
+#         existing.step = 0
+#         existing.otp = generate_otp()
+#         existing.otp_created_at = datetime.utcnow()
+#         existing.otp_last_sent_at = datetime.utcnow()
+#         db.commit()
+#         db.refresh(existing)
+#         send_email(vendor.email, existing.otp)
+#         return existing
+    
+#     hashed_password = get_password_hash(vendor.password)
+#     otp = generate_otp()
+#     now = datetime.utcnow()
+    
+#     db_vendor = ServiceProvider(
+#         full_name=vendor.full_name,
+#         email=vendor.email,
+#         phone=vendor.phone,
+#         password=hashed_password,
+#         terms_accepted=vendor.terms_accepted,
+#         identity_doc_type=vendor.identity_doc_type,
+#         identity_doc_number=vendor.identity_doc_number,
+#         new_fcm_token=vendor.new_fcm_token,
+#         old_fcm_token=vendor.old_fcm_token,
+#         latitude=vendor.latitude,
+#         longitude=vendor.longitude,
+#         device_name=vendor.device_name,
+#         step=0,
+#         otp=otp,
+#         otp_created_at=now,
+#         otp_last_sent_at=now,
+#         otp_verified=False,
+#         last_login=now,
+#         last_device_update=now,
+#         status='pending',
+#         admin_status='inactive',
+#         work_status='work_on'
+#     )
+#     db.add(db_vendor)
+#     db.commit()
+#     db.refresh(db_vendor)
+    
+#     send_email(vendor.email, otp)
+#     return db_vendor
+
+# def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse, str]:
+#     vendor = get_vendor_by_email(db, email)
+#     if not vendor:
+#         return None, "Vendor not found"
+    
+#     if vendor.otp_attempts >= MAX_OTP_ATTEMPTS:
+#         return None, "Maximum OTP attempts exceeded"
+    
+#     if vendor.otp != otp:
+#         vendor.otp_attempts += 1
+#         db.commit()
+#         return None, "Invalid OTP"
+    
+#     if (datetime.utcnow() - vendor.otp_created_at) > timedelta(minutes=OTP_EXPIRY_MINUTES):
+#         return None, "OTP expired"
+    
+#     vendor.otp_verified = True
+#     vendor.otp_attempts = 0
+#     vendor.status = 'pending'
+#     vendor.step = 1
+#     vendor.last_login = datetime.utcnow()
+#     db.commit()
+#     db.refresh(vendor)
+    
+#     # Send welcome email
+#     try:
+#         send_email(
+#             recipient=vendor.email,
+#             template_name="welcome",
+#             context={"name": vendor.full_name}
+#         )
+#         send_notification(
+#             recipient=vendor.email,
+#             notification_type=NotificationType.vendor_welcome,
+#             message=f"Welcome, {vendor.full_name}! Your account has been successfully verified.",
+#             recipient_id=vendor.id,
+#             fcm_token=vendor.new_fcm_token or vendor.old_fcm_token
+#         )
+#         logger.info(f"Welcome email and notification sent to vendor {vendor.id}")
+#     except Exception as e:
+#         logger.warning(f"Failed to send welcome email/notification to vendor {vendor.id}: {str(e)}")
+    
+#     vendor_response = build_vendor_response(db, vendor)
+#     return vendor_response, "OTP verified successfully"
+
+# def resend_otp(db: Session, email: str) -> None:
+#     vendor = get_vendor_by_email(db, email)
+#     if not vendor:
+#         raise HTTPException(status_code=404, detail="Vendor not found")
+    
+#     if vendor.otp_last_sent_at and (datetime.utcnow() - vendor.otp_last_sent_at) < timedelta(minutes=OTP_RESEND_COOLDOWN_MINUTES):
+#         raise HTTPException(status_code=429, detail="Please wait before requesting a new OTP")
+    
+#     if vendor.otp_attempts >= MAX_OTP_RESENDS:
+#         raise HTTPException(status_code=429, detail="Maximum OTP resend attempts exceeded")
+    
+#     otp = generate_otp()
+#     vendor.otp = otp
+#     vendor.otp_created_at = datetime.utcnow()
+#     vendor.otp_last_sent_at = datetime.utcnow()
+#     vendor.otp_attempts = 0
+#     send_email(email, otp)
+#     db.commit()
+
+
+def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
+    """
+    Verify OTP for vendor email verification.
+    Returns dict with success status, message, and vendor data.
+    """
+    try:
+        vendor = get_vendor_by_email(db, email)
+        
+        if not vendor:
+            logger.warning(f"OTP verification attempt for non-existent email: {email}")
+            return {
+                "success": False,
+                "message": "Vendor not found with this email.",
+                "data": None
+            }
+        
+        if vendor.otp_verified:
+            logger.warning(f"OTP verification attempt for already verified vendor: {email}")
+            return {
+                "success": False,
+                "message": "Your account is already verified. Please login.",
+                "data": None
+            }
+        
+        if vendor.otp_attempts >= MAX_OTP_ATTEMPTS:
+            logger.warning(f"Maximum OTP attempts exceeded for: {email}")
+            return {
+                "success": False,
+                "message": "Maximum OTP attempts exceeded. Please request a new OTP.",
+                "data": None
+            }
+        
+        if not vendor.otp:
+            logger.warning(f"No OTP found for vendor: {email}")
+            return {
+                "success": False,
+                "message": "No OTP found. Please request a new OTP.",
+                "data": None
+            }
+        
+        if vendor.otp != otp:
+            vendor.otp_attempts += 1
+            db.commit()
+            logger.warning(f"Invalid OTP attempt for: {email} (Attempts: {vendor.otp_attempts})")
+            return {
+                "success": False,
+                "message": f"Invalid OTP. {MAX_OTP_ATTEMPTS - vendor.otp_attempts} attempts remaining.",
+                "data": None
+            }
+        
+        # Check OTP expiry
+        if (datetime.utcnow() - vendor.otp_created_at) > timedelta(minutes=OTP_EXPIRY_MINUTES):
+            logger.warning(f"Expired OTP attempt for: {email}")
+            return {
+                "success": False,
+                "message": "OTP has expired. Please request a new OTP.",
+                "data": None
+            }
+        
+        # Verify vendor
+        vendor.otp_verified = True
+        vendor.otp_attempts = 0
+        vendor.otp = None
+        vendor.otp_created_at = None
+        vendor.status = 'pending'
+        vendor.step = 1
+        vendor.last_login = datetime.utcnow()
+        db.commit()
+        db.refresh(vendor)
+        
+        # Send welcome email
+        try:
+            send_email(
+                receiver_email=vendor.email,
+                template="welcome",
+                name=vendor.full_name
+            )
+            logger.info(f"Welcome email sent to vendor: {vendor.email}")
+        except Exception as e:
+            logger.error(f"Failed to send welcome email to {vendor.email}: {str(e)}")
+        
+        # Send notification if FCM token available
+        fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
+        if fcm_token:
+            try:
+                send_notification(
+                    recipient=vendor.email,
+                    notification_type=NotificationType.vendor_welcome,
+                    message=f"Welcome, {vendor.full_name}! Your account has been verified.",
+                    recipient_id=vendor.id,
+                    fcm_token=fcm_token
+                )
+                logger.info(f"Welcome notification sent to vendor {vendor.id}")
+            except Exception as e:
+                logger.warning(f"Failed to send welcome notification: {str(e)}")
+        
+        vendor_response = build_vendor_response(db, vendor)
+        logger.info(f"Vendor OTP verified successfully: {email}")
+        
+        return {
+            "success": True,
+            "message": "Email verified successfully! You can now complete your profile.",
+            "data": vendor_response
+        }
+    
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in verify_vendor_otp: {str(e)}")
+        return {
+            "success": False,
+            "message": "Database error occurred. Please try again.",
+            "data": None
+        }
     except Exception as e:
         db.rollback()
-        logger.error(f"Unexpected error in delete_vendor: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        logger.exception(f"Unexpected error in verify_vendor_otp: {str(e)}")
+        return {
+            "success": False,
+            "message": f"An error occurred: {str(e)}",
+            "data": None
+        }
 
-def vendor_login(db: Session, email: str, password: str) -> Tuple[VendorResponse, str]:
-    vendor = get_vendor_by_email(db, email)
-    if not vendor:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
-    
-    if not verify_password(password, vendor.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    vendor.last_login = datetime.utcnow()
-    db.commit()
-    db.refresh(vendor)
-    
-    vendor_response = build_vendor_response(db, vendor)
-    return vendor_response, "Login successful"
 
-def create_vendor(db: Session, vendor: VendorCreate) -> ServiceProvider:
-    existing = get_vendor_by_email(db, email=vendor.email)
-    if existing and existing.otp_verified:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    if existing and not existing.otp_verified:
-        existing.full_name = vendor.full_name
-        existing.phone = vendor.phone
-        existing.password = get_password_hash(vendor.password)
-        existing.terms_accepted = vendor.terms_accepted
-        existing.identity_doc_type = vendor.identity_doc_type
-        existing.identity_doc_number = vendor.identity_doc_number
-        existing.new_fcm_token = vendor.new_fcm_token
-        existing.old_fcm_token = vendor.old_fcm_token
-        existing.latitude = vendor.latitude
-        existing.longitude = vendor.longitude
-        existing.device_name = vendor.device_name
-        existing.step = 0
-        existing.otp = generate_otp()
-        existing.otp_created_at = datetime.utcnow()
-        existing.otp_last_sent_at = datetime.utcnow()
-        db.commit()
-        db.refresh(existing)
-        send_email(vendor.email, existing.otp)
-        return existing
-    
-    hashed_password = get_password_hash(vendor.password)
-    otp = generate_otp()
-    now = datetime.utcnow()
-    
-    db_vendor = ServiceProvider(
-        full_name=vendor.full_name,
-        email=vendor.email,
-        phone=vendor.phone,
-        password=hashed_password,
-        terms_accepted=vendor.terms_accepted,
-        identity_doc_type=vendor.identity_doc_type,
-        identity_doc_number=vendor.identity_doc_number,
-        new_fcm_token=vendor.new_fcm_token,
-        old_fcm_token=vendor.old_fcm_token,
-        latitude=vendor.latitude,
-        longitude=vendor.longitude,
-        device_name=vendor.device_name,
-        step=0,
-        otp=otp,
-        otp_created_at=now,
-        otp_last_sent_at=now,
-        otp_verified=False,
-        last_login=now,
-        last_device_update=now,
-        status='pending',
-        admin_status='inactive',
-        work_status='work_on'
-    )
-    db.add(db_vendor)
-    db.commit()
-    db.refresh(db_vendor)
-    
-    send_email(vendor.email, otp)
-    return db_vendor
-
-def verify_vendor_otp(db: Session, email: str, otp: str) -> Tuple[VendorResponse, str]:
-    vendor = get_vendor_by_email(db, email)
-    if not vendor:
-        return None, "Vendor not found"
-    
-    if vendor.otp_attempts >= MAX_OTP_ATTEMPTS:
-        return None, "Maximum OTP attempts exceeded"
-    
-    if vendor.otp != otp:
-        vendor.otp_attempts += 1
-        db.commit()
-        return None, "Invalid OTP"
-    
-    if (datetime.utcnow() - vendor.otp_created_at) > timedelta(minutes=OTP_EXPIRY_MINUTES):
-        return None, "OTP expired"
-    
-    vendor.otp_verified = True
-    vendor.otp_attempts = 0
-    vendor.status = 'pending'
-    vendor.step = 1
-    vendor.last_login = datetime.utcnow()
-    db.commit()
-    db.refresh(vendor)
-    
-    # Send welcome email
+def resend_otp(db: Session, email: str) -> Dict[str, Any]:
+    """Resend OTP for vendor email verification."""
     try:
-        send_email(
-            recipient=vendor.email,
-            template_name="welcome",
-            context={"name": vendor.full_name}
-        )
-        send_notification(
-            recipient=vendor.email,
-            notification_type=NotificationType.vendor_welcome,
-            message=f"Welcome, {vendor.full_name}! Your account has been successfully verified.",
-            recipient_id=vendor.id,
-            fcm_token=vendor.new_fcm_token or vendor.old_fcm_token
-        )
-        logger.info(f"Welcome email and notification sent to vendor {vendor.id}")
+        vendor = get_vendor_by_email(db, email)
+        
+        if not vendor:
+            logger.warning(f"OTP resend attempt for non-existent email: {email}")
+            return {
+                "success": False,
+                "message": "Vendor not found with this email.",
+                "data": None
+            }
+        
+        if vendor.otp_verified:
+            logger.warning(f"OTP resend attempt for already verified vendor: {email}")
+            return {
+                "success": False,
+                "message": "Your account is already verified. Please login.",
+                "data": None
+            }
+        
+        # Check cooldown
+        if vendor.otp_last_sent_at:
+            time_since_last = datetime.utcnow() - vendor.otp_last_sent_at
+            if time_since_last < timedelta(minutes=OTP_RESEND_COOLDOWN_MINUTES):
+                remaining = OTP_RESEND_COOLDOWN_MINUTES * 60 - time_since_last.seconds
+                logger.warning(f"OTP resend cooldown for: {email}")
+                return {
+                    "success": False,
+                    "message": f"Please wait {remaining} seconds before requesting a new OTP.",
+                    "data": None
+                }
+        
+        if vendor.otp_attempts >= MAX_OTP_RESENDS:
+            logger.warning(f"Maximum OTP resend attempts exceeded for: {email}")
+            return {
+                "success": False,
+                "message": "Maximum OTP resend attempts exceeded. Please try again later.",
+                "data": None
+            }
+        
+        otp = generate_otp()
+        vendor.otp = otp
+        vendor.otp_created_at = datetime.utcnow()
+        vendor.otp_last_sent_at = datetime.utcnow()
+        vendor.otp_attempts = 0
+        db.commit()
+        db.refresh(vendor)
+        
+        # Send OTP
+        try:
+            send_email(email, otp, template="otp")
+            logger.info(f"OTP resent to: {email}")
+        except Exception as e:
+            logger.error(f"Failed to resend OTP to {email}: {str(e)}")
+        
+        return {
+            "success": True,
+            "message": "OTP resent successfully to your email.",
+            "data": None
+        }
+    
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in resend_otp: {str(e)}")
+        return {
+            "success": False,
+            "message": "Database error occurred. Please try again.",
+            "data": None
+        }
     except Exception as e:
-        logger.warning(f"Failed to send welcome email/notification to vendor {vendor.id}: {str(e)}")
-    
-    vendor_response = build_vendor_response(db, vendor)
-    return vendor_response, "OTP verified successfully"
+        db.rollback()
+        logger.exception(f"Unexpected error in resend_otp: {str(e)}")
+        return {
+            "success": False,
+            "message": f"An error occurred: {str(e)}",
+            "data": None
+        }
 
-def resend_otp(db: Session, email: str) -> None:
-    vendor = get_vendor_by_email(db, email)
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
+
+# =================== VENDOR LOGIN ===================
+
+def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
+    """
+    Authenticate vendor with email and password.
+    Returns dict with success status, message, and vendor data.
+    """
+    try:
+        vendor = get_vendor_by_email(db, email)
+        
+        if not vendor:
+            logger.warning(f"Login attempt with non-existent email: {email}")
+            return {
+                "success": False,
+                "message": "No account found with this email address. Please register first.",
+                "data": None
+            }
+        
+        if not vendor.otp_verified:
+            logger.warning(f"Login attempt with unverified email: {email}")
+            return {
+                "success": False,
+                "message": "Your email is not verified. Please verify your email using the OTP sent during registration.",
+                "data": None
+            }
+        
+        if not verify_password(password, vendor.password):
+            logger.warning(f"Login attempt with incorrect password for: {email}")
+            return {
+                "success": False,
+                "message": "Incorrect password. Please try again or reset your password.",
+                "data": None
+            }
+        
+        # Update last login
+        vendor.last_login = datetime.utcnow()
+        db.commit()
+        db.refresh(vendor)
+        
+        vendor_response = build_vendor_response(db, vendor)
+        logger.info(f"Vendor logged in successfully: {email}")
+        
+        return {
+            "success": True,
+            "message": "Login successful!",
+            "data": vendor_response
+        }
     
-    if vendor.otp_last_sent_at and (datetime.utcnow() - vendor.otp_last_sent_at) < timedelta(minutes=OTP_RESEND_COOLDOWN_MINUTES):
-        raise HTTPException(status_code=429, detail="Please wait before requesting a new OTP")
-    
-    if vendor.otp_attempts >= MAX_OTP_RESENDS:
-        raise HTTPException(status_code=429, detail="Maximum OTP resend attempts exceeded")
-    
-    otp = generate_otp()
-    vendor.otp = otp
-    vendor.otp_created_at = datetime.utcnow()
-    vendor.otp_last_sent_at = datetime.utcnow()
-    vendor.otp_attempts = 0
-    send_email(email, otp)
-    db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in vendor_login: {str(e)}")
+        return {
+            "success": False,
+            "message": "Database error occurred. Please try again.",
+            "data": None
+        }
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Unexpected error in vendor_login: {str(e)}")
+        return {
+            "success": False,
+            "message": f"An error occurred: {str(e)}",
+            "data": None
+        }
+
 
 def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
