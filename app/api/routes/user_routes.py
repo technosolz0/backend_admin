@@ -356,8 +356,11 @@ def verify_user_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db)):
             detail=result["message"]
         )
 
-    # Generate access token
-    access_token = create_access_token(data={"sub": result["data"].email})
+    # Generate access token with role
+    access_token = create_access_token(
+        data={"sub": result["data"].email},
+        role="user"  # ✅ Important: Specify role for user
+    )
     
     logger.info(f"User verified successfully: {data.email}")
     return {
@@ -447,8 +450,11 @@ def login_user(
 
     user = result["data"]
     
-    # Generate access token
-    access_token = create_access_token(data={"sub": user.email})
+    # Generate access token with role
+    access_token = create_access_token(
+        data={"sub": user.email},
+        role="user"  # ✅ Important: Specify role for user
+    )
 
     logger.info(f"User logged in successfully: {login_data.email}")
     return {
