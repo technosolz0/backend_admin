@@ -1,10 +1,15 @@
 
 
-# # mac changes 
+# # mac changes
 # from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header
 # from sqlalchemy.orm import Session
 # from pydantic import BaseModel
-# import razorpay
+try:
+    import razorpay
+    RAZORPAY_AVAILABLE = True
+except ImportError:
+    RAZORPAY_AVAILABLE = False
+    razorpay = None
 # import hmac
 # import hashlib
 # import json
@@ -590,7 +595,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-import razorpay
+try:
+    import razorpay
+    RAZORPAY_AVAILABLE = True
+except ImportError:
+    RAZORPAY_AVAILABLE = False
+    razorpay = None
 import hmac
 import hashlib
 import json
@@ -610,16 +620,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["Payment"])
 
 # Initialize Razorpay client
-try:
-    if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
-        logger.error("Razorpay credentials missing in configuration")
-        raise ValueError("Razorpay API credentials are not configured")
-    razorpay_client = razorpay.Client(
-        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-    )
-except Exception as e:
-    logger.error(f"Failed to initialize Razorpay client: {str(e)}")
-    raise ValueError(f"Razorpay initialization failed: {str(e)}")
+razorpay_client = None
+if RAZORPAY_AVAILABLE:
+    try:
+        if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+            logger.warning("Razorpay credentials missing in configuration")
+        else:
+            razorpay_client = razorpay.Client(
+                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+            )
+            logger.info("Razorpay client initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Razorpay client: {str(e)}")
+else:
+    logger.warning("Razorpay package not installed. Payment features will be disabled.")
 
 # ================== PYDANTIC MODELS ==================
 
