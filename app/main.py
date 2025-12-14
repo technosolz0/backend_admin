@@ -127,6 +127,9 @@ from app.api.routes import (
     cancel_reason_routes,
     vendor_dashboard_routes,
     withdrawal_routes, admin_withdrawal_routes,vendor_bank_routes,
+    notification_routes,
+    feedback_routes,
+    review_routes,
 )
 
 # -------------------------
@@ -206,6 +209,11 @@ app.include_router(vendor_dashboard_routes.router, prefix="/api")
 app.include_router(withdrawal_routes.router, prefix="/api")
 app.include_router(admin_withdrawal_routes.router, prefix="/api")
 app.include_router(vendor_bank_routes.router, prefix="/api")
+
+# New feature routes
+app.include_router(notification_routes.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["feedback"])
+app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"])
 
 # -------------------------
 # Custom OpenAPI with JWT

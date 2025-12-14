@@ -450,10 +450,17 @@ def login_user(
 
     user = result["data"]
     
-    # Generate access token with role
+    # Generate access token with role (24 hours for persistent login)
     access_token = create_access_token(
         data={"sub": user.email},
         role="user"  # ✅ Important: Specify role for user
+    )
+
+    # Generate refresh token (30 days)
+    refresh_token = create_access_token(
+        data={"sub": user.email},
+        token_type="refresh",
+        role="user"
     )
 
     logger.info(f"User logged in successfully: {login_data.email}")
@@ -461,6 +468,7 @@ def login_user(
         "success": True,
         "message": result["message"],
         "access_token": access_token,
+        "refresh_token": refresh_token,  # ✅ Add refresh token
         "token_type": "bearer",
         "user": {
             "id": user.id,
@@ -848,6 +856,93 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     }
 
 
+# ================= REFRESH TOKEN ENDPOINT =================
+
+@router.post("/refresh-token", response_model=dict, status_code=status.HTTP_200_OK)
+def refresh_access_token(
+    refresh_data: dict,  # {"refresh_token": "..."}
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token.
+
+    Returns:
+    - 200: New access token generated successfully
+    - 401: Invalid or expired refresh token
+    """
+    refresh_token = refresh_data.get("refresh_token")
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refresh token is required"
+        )
+
+    try:
+        # Decode and validate refresh token
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        # Check if it's a refresh token
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+
+        email = payload.get("sub")
+        role = payload.get("role", "user")
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
+
+        # Verify user still exists and is active
+        if role == "vendor":
+            user = db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
+        else:
+            user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+
+        # Check if user is active (for regular users)
+        if hasattr(user, 'status') and user.status.value != 'active':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is not active"
+            )
+
+        # Generate new access token
+        new_access_token = create_access_token(
+            data={"sub": email},
+            role=role
+        )
+
+        logger.info(f"Access token refreshed for user: {email}")
+        return {
+            "success": True,
+            "message": "Access token refreshed successfully",
+            "access_token": new_access_token,
+            "token_type": "bearer"
+        }
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired"
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+
+
 # ================= VENDOR SERVICE CHARGES ENDPOINT =================
 
 @router.get("/vendors-charges/{category_id}/{subcategory_id}", response_model=dict)
@@ -858,14 +953,14 @@ def get_vendors_and_charges(
 ):
     """Get vendors and their charges for a category/subcategory."""
     data = crud_user.fetch_service_charges_and_vendors(db, category_id, subcategory_id)
-    
+
     if data is None:
         logger.error(f"Category or subcategory not found: cat={category_id}, subcat={subcategory_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category or subcategory not found"
         )
-    
+
     if data == []:
         logger.warning(f"No vendors found for category {category_id}, subcategory {subcategory_id}")
         return {
@@ -877,7 +972,7 @@ def get_vendors_and_charges(
                 "vendors": []
             }
         }
-    
+
     logger.info(f"Retrieved vendors for category {category_id}, subcategory {subcategory_id}")
     return {
         "success": True,

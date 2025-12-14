@@ -456,6 +456,126 @@ def get_subcategories(
         query = query.filter(SubCategory.category_id == category_id)
     return query.all()
 
+
+# =================== LOCATION-BASED VENDOR FILTERING ===================
+
+@router.get("/nearby/{category_id}/{subcategory_id}")
+def get_nearby_vendors(
+    category_id: int,
+    subcategory_id: int,
+    user_lat: float,
+    user_lng: float,
+    radius_km: float = 5.0,  # Default 5km radius
+    db: Session = Depends(get_db)
+):
+    """
+    Get vendors within specified radius of user's location.
+
+    Parameters:
+    - category_id: Service category ID
+    - subcategory_id: Service subcategory ID
+    - user_lat: User's latitude
+    - user_lng: User's longitude
+    - radius_km: Search radius in kilometers (default: 5.0)
+
+    Returns:
+    - List of vendors with their charges and distance from user
+    """
+    try:
+        # Import math for distance calculation
+        import math
+
+        def calculate_distance(lat1, lng1, lat2, lng2):
+            """Calculate distance between two points using Haversine formula."""
+            R = 6371  # Earth's radius in kilometers
+
+            lat1_rad = math.radians(lat1)
+            lng1_rad = math.radians(lng1)
+            lat2_rad = math.radians(lat2)
+            lng2_rad = math.radians(lng2)
+
+            dlat = lat2_rad - lat1_rad
+            dlng = lng2_rad - lng1_rad
+
+            a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlng/2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+            return R * c
+
+        # Query vendors with the specified category and subcategory
+        vendors = db.query(ServiceProvider).filter(
+            ServiceProvider.category_id == category_id,
+            ServiceProvider.admin_status == 'active',
+            ServiceProvider.work_status == 'work_on',
+            ServiceProvider.latitude.isnot(None),
+            ServiceProvider.longitude.isnot(None)
+        ).all()
+
+        nearby_vendors = []
+
+        for vendor in vendors:
+            # Check if vendor has charges for the requested subcategory
+            vendor_charges = []
+            for charge in vendor.subcategory_charges:
+                if charge.subcategory_id == subcategory_id:
+                    vendor_charges.append({
+                        "subcategory_id": charge.subcategory_id,
+                        "subcategory_name": charge.subcategory_name,
+                        "price": charge.price,
+                        "description": charge.description
+                    })
+
+            # Skip vendor if no charges for this subcategory
+            if not vendor_charges:
+                continue
+
+            # Calculate distance
+            distance = calculate_distance(
+                user_lat, user_lng,
+                float(vendor.latitude), float(vendor.longitude)
+            )
+
+            # Include vendor if within radius
+            if distance <= radius_km:
+                vendor_data = {
+                    "id": vendor.id,
+                    "full_name": vendor.full_name,
+                    "email": vendor.email,
+                    "phone": vendor.phone,
+                    "profile_pic": vendor.profile_pic,
+                    "latitude": vendor.latitude,
+                    "longitude": vendor.longitude,
+                    "distance_km": round(distance, 2),
+                    "rating": getattr(vendor, 'rating', 0.0),
+                    "total_reviews": getattr(vendor, 'total_reviews', 0),
+                    "experience_years": vendor.experience_years,
+                    "description": vendor.description,
+                    "work_status": vendor.work_status,
+                    "admin_status": vendor.admin_status,
+                    "charges": vendor_charges
+                }
+                nearby_vendors.append(vendor_data)
+
+        # Sort by distance (closest first)
+        nearby_vendors.sort(key=lambda x: x['distance_km'])
+
+        logger.info(f"Found {len(nearby_vendors)} vendors within {radius_km}km of user location")
+
+        return {
+            "success": True,
+            "count": len(nearby_vendors),
+            "radius_km": radius_km,
+            "user_location": {"latitude": user_lat, "longitude": user_lng},
+            "vendors": nearby_vendors
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching nearby vendors: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 # from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 # from sqlalchemy.orm import Session
 # from typing import List, Optional

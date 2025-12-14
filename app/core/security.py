@@ -27,18 +27,20 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-# ✅ JWT creation - Updated to include 'role'
+# ✅ JWT creation - Updated to include 'role' with persistent login settings
 def create_access_token(data: dict, expires_delta: timedelta = None, token_type: str = "access", role: str = "user"):
     """
     Create JWT access or refresh tokens with role.
-    - role: 'user' or 'vendor'
+    - Access tokens: 24 hours (persistent login like Instagram)
+    - Refresh tokens: 30 days
+    - role: 'user', 'vendor', or 'admin'
     """
     to_encode = data.copy()
 
     if token_type == "refresh":
         expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=30))
-    else:  # access token
-        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=30))
+    else:  # access token - 24 hours for persistent login
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=24))
 
     to_encode.update({
         "exp": expire,
