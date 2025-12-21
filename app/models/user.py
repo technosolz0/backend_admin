@@ -35,3 +35,8 @@ class User(Base):
     last_login_ip = Column(String, nullable=True)
     addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="user")
+    sent_notifications = relationship(
+    "Notification",
+    back_populates="sender",
+    cascade="all, delete-orphan"
+)
