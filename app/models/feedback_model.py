@@ -19,9 +19,20 @@ class Feedback(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relationships
-    user = relationship("User", foreign_keys=[user_id], back_populates="feedbacks")
-    admin = relationship("User", foreign_keys=[responded_by])
+    # # Relationships
+    # user = relationship("User", foreign_keys=[user_id], back_populates="feedbacks")
+    # admin = relationship("User", foreign_keys=[responded_by])
+    user = relationship(
+    "User",
+    foreign_keys=[user_id],
+    back_populates="feedbacks"
+    )
+
+    admin = relationship(
+        "User",
+        foreign_keys=[responded_by]
+    )
+
 
     def __repr__(self):
         return f"<Feedback(id={self.id}, user_id={self.user_id}, subject='{self.subject}')>"

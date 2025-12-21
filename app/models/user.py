@@ -36,4 +36,15 @@ class User(Base):
     addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="user")
     sent_notifications = relationship("Notification", back_populates="sender", cascade="all, delete-orphan")
-    feedbacks = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
+    # feedbacks = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
+    feedbacks = relationship(
+    "Feedback",
+    foreign_keys="Feedback.user_id",
+    back_populates="user",
+    cascade="all, delete-orphan")
+
+# Feedbacks RESPONDED by admin user
+    admin_feedbacks = relationship(
+        "Feedback",
+        foreign_keys="Feedback.responded_by"
+    )
