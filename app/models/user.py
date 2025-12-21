@@ -42,6 +42,12 @@ class User(Base):
     foreign_keys="Feedback.user_id",
     back_populates="user",
     cascade="all, delete-orphan")
+    reviews = relationship(
+    "Review",
+    foreign_keys="Review.user_id",
+    back_populates="user",
+    cascade="all, delete-orphan"
+    )
 
 # Feedbacks RESPONDED by admin user
     admin_feedbacks = relationship(
