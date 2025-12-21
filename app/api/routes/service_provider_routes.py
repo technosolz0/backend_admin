@@ -310,6 +310,33 @@ def update_work_details(
         )
 
 
+@router.patch("/profile/work", response_model=VendorResponse)
+def patch_work_details(
+    vendor_id: int = Body(...),
+    update: WorkDetailsUpdate = Body(...),
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """Patch vendor work details (merge/update without deleting other categories)."""
+    try:
+        if current_vendor.id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this vendor"
+            )
+        vendor = update_vendor_work(db, vendor_id, update)
+        logger.info(f"Work details patched for vendor: {vendor_id}")
+        return vendor
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error patching work details for vendor {vendor_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
 @router.post("/profile/documents", response_model=VendorResponse)
 def upload_documents(
     vendor_id: int = Form(...),
@@ -441,8 +468,8 @@ def update_admin_status(
 
 @router.get("/categories", response_model=List[CategoryOut])
 def list_all_categories(db: Session = Depends(get_db)):
-    """Get all categories."""
-    return db.query(Category).all()
+    """Get all active categories."""
+    return db.query(Category).filter(Category.status == 'active').all()
 
 
 @router.get("/subcategories", response_model=List[SubCategoryOut])

@@ -957,7 +957,12 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
     try:
         logger.debug(f"Setting category_id: {update.category_id}")
         vendor.category_id = update.category_id
-        vendor.subcategory_charges.clear()
+
+        # Delete existing charges for this category only (to allow multiple categories)
+        db.query(VendorSubcategoryCharge).filter(
+            VendorSubcategoryCharge.vendor_id == vendor_id,
+            VendorSubcategoryCharge.category_id == update.category_id
+        ).delete()
 
         for charge in update.subcategory_charges:
             logger.debug(f"Processing subcategory charge: {charge}")
@@ -993,7 +998,7 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
         logger.debug(f"Committing changes for vendor_id: {vendor_id}")
         db.commit()
         db.refresh(vendor)
-        
+
         logger.info(f"Vendor work details updated successfully: {vendor.id}")
         return build_vendor_response(db, vendor)
     except HTTPException as e:
@@ -1134,4 +1139,3 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
     db.refresh(vendor)
     
     return build_vendor_response(db, vendor)
-
