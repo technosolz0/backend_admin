@@ -22,6 +22,7 @@ class Review(Base):
     booking = relationship("Booking", back_populates="reviews")
     user = relationship("User", foreign_keys=[user_id], back_populates="reviews")
     service_provider = relationship("ServiceProvider", back_populates="reviews")
+    
 
     # Constraints
     __table_args__ = (
