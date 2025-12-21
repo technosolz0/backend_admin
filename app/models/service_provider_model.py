@@ -73,3 +73,9 @@ class ServiceProvider(Base):
         back_populates="vendor",
         cascade="all, delete-orphan"
     )
+    reviews = relationship(
+        "Review",  # Review should be the model name
+        foreign_keys="Review.service_provider_id",  # Specify the FK column (if necessary)
+        back_populates="service_provider",  # Back reference in the Review model
+        cascade="all, delete-orphan"  # Manage orphaned reviews if any
+    )
