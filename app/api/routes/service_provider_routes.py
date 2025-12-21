@@ -144,16 +144,24 @@ def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db
     vendor = result["data"]
     
     # ✅ Generate access token with role="vendor"
-    token = create_access_token(
+    access_token = create_access_token(
         data={"sub": vendor.email},
         role="vendor"  # Important: Specify role for vendor authentication
     )
-    
+
+    # ✅ Generate refresh token (30 days)
+    refresh_token = create_access_token(
+        data={"sub": vendor.email},
+        token_type="refresh",
+        role="vendor"
+    )
+
     logger.info(f"Vendor logged in successfully: {data.email}")
     return {
         "success": True,
         "message": result["message"],
-        "access_token": token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,  # ✅ Add refresh token
         "token_type": "bearer",
         "vendor": vendor
     }
@@ -482,6 +490,93 @@ def get_subcategories(
     if category_id:
         query = query.filter(SubCategory.category_id == category_id)
     return query.all()
+
+
+# =================== REFRESH TOKEN ENDPOINT ===================
+
+@router.post("/refresh-token", response_model=dict, status_code=status.HTTP_200_OK)
+def refresh_vendor_token(
+    refresh_data: dict,  # {"refresh_token": "..."}
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token for vendors.
+
+    Returns:
+    - 200: New access token generated successfully
+    - 401: Invalid or expired refresh token
+    """
+    from jose import jwt, JWTError, ExpiredSignatureError
+    from app.core.config import SECRET_KEY, ALGORITHM
+
+    refresh_token = refresh_data.get("refresh_token")
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refresh token is required"
+        )
+
+    try:
+        # Decode and validate refresh token
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        # Check if it's a refresh token
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+
+        email = payload.get("sub")
+        role = payload.get("role", "vendor")
+
+        if not email or role != "vendor":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token"
+            )
+
+        # Verify vendor still exists and is active
+        vendor = db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
+
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Vendor not found"
+            )
+
+        # Check if vendor is active
+        if vendor.admin_status != 'active':
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account is not active"
+            )
+
+        # Generate new access token
+        new_access_token = create_access_token(
+            data={"sub": email},
+            role="vendor"
+        )
+
+        logger.info(f"Access token refreshed for vendor: {email}")
+        return {
+            "success": True,
+            "message": "Access token refreshed successfully",
+            "access_token": new_access_token,
+            "token_type": "bearer"
+        }
+
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired"
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
 
 
 # =================== LOCATION-BASED VENDOR FILTERING ===================
