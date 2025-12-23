@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from ...database import get_db
+from app.core.security import get_db
 from ...models.feedback_model import Feedback
 from ...models.user import User
 from ...crud.feedback_crud import FeedbackCRUD
-from ...core.security import get_current_user, get_current_admin_user
+from ...core.security import get_current_user, get_current_admin
 
 router = APIRouter()
 
@@ -73,7 +73,7 @@ def get_all_feedback(
     limit: int = 100,
     resolved: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get all feedback for admin"""
     feedback_crud = FeedbackCRUD(db)
@@ -111,7 +111,7 @@ def get_all_feedback(
 def get_feedback_detail(
     feedback_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get feedback detail for admin"""
     feedback_crud = FeedbackCRUD(db)
@@ -141,7 +141,7 @@ def respond_to_feedback(
     feedback_id: int,
     response: str,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Respond to feedback"""
     feedback_crud = FeedbackCRUD(db)
@@ -157,7 +157,7 @@ def update_feedback_status(
     feedback_id: int,
     resolved: bool,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Update feedback resolution status"""
     feedback_crud = FeedbackCRUD(db)
@@ -172,7 +172,7 @@ def update_feedback_status(
 def delete_feedback(
     feedback_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Delete feedback"""
     feedback_crud = FeedbackCRUD(db)
@@ -186,7 +186,7 @@ def delete_feedback(
 @router.get("/admin/stats")
 def get_feedback_stats(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get feedback statistics"""
     feedback_crud = FeedbackCRUD(db)
