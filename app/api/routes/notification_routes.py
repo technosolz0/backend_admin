@@ -6,8 +6,8 @@ from app.core.security import get_db
 from ...models.notification_model import Notification, NotificationType, NotificationTarget
 from ...models.user import User
 from ...crud.notification_crud import NotificationCRUD
-from ...utils.fcm import send_fcm_notification
-from ...core.security import get_current_admin_user
+from ...utils.fcm import send_push_notification
+from ...core.security import get_current_admin
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def send_custom_notification(
     target_user_ids: Optional[List[int]] = None,
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Send custom notification to users"""
     try:
@@ -70,7 +70,7 @@ async def send_notifications_to_users(users: List[User], title: str, message: st
         try:
             # Send FCM notification if user has FCM token
             if user.fcm_token:
-                await send_fcm_notification(
+                await send_push_notification(
                     token=user.fcm_token,
                     title=title,
                     body=message,
@@ -97,7 +97,7 @@ def get_notifications(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get all notifications"""
     notification_crud = NotificationCRUD(db)
@@ -126,7 +126,7 @@ def get_notifications(
 def get_notification(
     notification_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get notification by ID"""
     notification_crud = NotificationCRUD(db)
@@ -152,7 +152,7 @@ def get_notification(
 def delete_notification(
     notification_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Delete a notification"""
     notification_crud = NotificationCRUD(db)
@@ -166,7 +166,7 @@ def delete_notification(
 @router.get("/stats/overview")
 def get_notification_stats(
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get notification statistics"""
     notification_crud = NotificationCRUD(db)
