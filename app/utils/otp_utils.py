@@ -157,12 +157,13 @@ def send_email(receiver_email: str, otp: str = None, template: str = "otp", book
         payment: Payment object (for receipt template)
         name (str, optional): User name (for welcome template)
     """
-    sender_email = os.getenv("EMAIL_USERNAME")
-    sender_password = os.getenv("EMAIL_PASSWORD")
+    sender_email = os.getenv("SMTP_USER")
+    sender_password = os.getenv("SMTP_PASS")
     smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", 465))
 
-    if not sender_email or not sender_password:
-        logger.error("EMAIL_USERNAME or EMAIL_PASSWORD not set")
+    if not sender_email or not sender_password or not smtp_host:
+        logger.error("SMTP_USER, SMTP_PASS, or SMTP_HOST not set")
         raise ValueError("Email configuration missing")
 
     if template == "password_reset":
@@ -386,7 +387,7 @@ def send_email(receiver_email: str, otp: str = None, template: str = "otp", book
     message.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP_SSL(smtp_host, 465) as server:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, receiver_email, message.as_string())
         logger.info(f"Email sent successfully to {receiver_email} with template '{template}'")
