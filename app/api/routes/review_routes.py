@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from ...database import get_db
+from app.core.security import get_db
 from ...models.review_model import Review
 from ...models.user import User
 from ...models.booking_model import Booking
 from ...crud.review_crud import ReviewCRUD
-from ...core.security import get_current_user, get_current_admin_user
+from ...core.security import get_current_user, get_current_admin
 
 router = APIRouter()
 
@@ -176,7 +176,7 @@ def get_all_reviews(
     limit: int = 100,
     approved: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get all reviews for admin"""
     review_crud = ReviewCRUD(db)
@@ -213,7 +213,7 @@ def approve_review(
     review_id: int,
     approved: bool = True,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Approve or reject a review"""
     review_crud = ReviewCRUD(db)
@@ -228,7 +228,7 @@ def approve_review(
 def delete_review_admin(
     review_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Delete any review (admin only)"""
     review_crud = ReviewCRUD(db)
@@ -243,7 +243,7 @@ def delete_review_admin(
 def get_top_rated_providers(
     limit: int = 10,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(get_current_admin_user)
+    current_admin: User = Depends(get_current_admin)
 ):
     """Get top-rated service providers"""
     review_crud = ReviewCRUD(db)
