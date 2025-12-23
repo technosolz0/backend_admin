@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
-
-from ...database import get_db
+from app.core.security import get_db
 from ...models.notification_model import Notification, NotificationType, NotificationTarget
 from ...models.user import User
 from ...crud.notification_crud import NotificationCRUD
