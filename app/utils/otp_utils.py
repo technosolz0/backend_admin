@@ -159,6 +159,7 @@ def send_email(receiver_email: str, otp: str = None, template: str = "otp", book
     """
     sender_email = os.getenv("EMAIL_USERNAME")
     sender_password = os.getenv("EMAIL_PASSWORD")
+    smtp_host = os.getenv("SMTP_HOST")
 
     if not sender_email or not sender_password:
         logger.error("EMAIL_USERNAME or EMAIL_PASSWORD not set")
@@ -385,7 +386,7 @@ def send_email(receiver_email: str, otp: str = None, template: str = "otp", book
     message.attach(MIMEText(html, "html"))
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP_SSL(smtp_host, 465) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, receiver_email, message.as_string())
         logger.info(f"Email sent successfully to {receiver_email} with template '{template}'")
