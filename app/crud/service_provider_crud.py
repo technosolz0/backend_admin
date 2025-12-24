@@ -284,7 +284,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
             
             return {
                 "success": True,
-                "message": "OTP sent to your email. Please verify to complete registration.",
+                "message": f"OTP sent to {vendor.email}",
                 "data": {"vendor_id": existing.id, "step": existing.step}
             }
         
@@ -332,7 +332,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         
         return {
             "success": True,
-            "message": "Registration successful! OTP sent to your email. Please verify to continue.",
+            "message": f"OTP sent to {vendor.email}",
             "data": {"vendor_id": db_vendor.id, "step": db_vendor.step}
         }
     

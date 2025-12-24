@@ -103,7 +103,7 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
             
             return {
                 "success": True,
-                "message": "OTP sent to your email. Please verify to complete registration.",
+                "message": f"OTP sent to {user.email}",
                 "data": existing_user
             }
 
@@ -137,7 +137,7 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
         
         return {
             "success": True,
-            "message": "Registration successful! OTP sent to your email. Please verify to complete registration.",
+            "message": f"OTP sent to {user.email}",
             "data": db_user
         }
 
