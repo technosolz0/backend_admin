@@ -11,7 +11,7 @@ def create_super_admin():
     mobile = "9999999999"  # <-- Add mobile here
 
     if db.query(User).filter(User.email == email).first():
-        print("❗ Super admin already exists.")
+        print("Super admin already exists.")
         return
 
     user = User(
