@@ -488,6 +488,21 @@ def cancel_booking(
     else:
         raise HTTPException(status_code=400, detail=f"Cannot cancel booking with status {booking.status}")
 
+@router.delete("/admin/{booking_id}")
+def delete_booking_admin(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
+    """Admin only: permanently delete a booking if it's pending or cancelled."""
+    try:
+        success = booking_crud.delete_booking(db, booking_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Booking not found")
+        return {"message": "Booking deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/{booking_id}/send-completion-otp")
 def send_completion_otp(
     booking_id: int,
