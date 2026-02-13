@@ -410,11 +410,13 @@ def update_work_status(
 def get_all_vendors_endpoint(
     db: Session = Depends(get_db),
     page: int = 1,
-    limit: int = 10
+    limit: int = 10,
+    search: Optional[str] = None,
+    status: Optional[str] = None
 ):
-    """Get all vendors with pagination."""
+    """Get all vendors with pagination, search, and status filters."""
     try:
-        vendors, total = get_all_vendors(db, page, limit)
+        vendors, total = get_all_vendors(db, page, limit, search, status)
         return {"vendors": vendors, "total": total}
     except Exception as e:
         logger.error(f"Error in get_all_vendors: {str(e)}")

@@ -72,6 +72,20 @@ def enrich_booking(db: Session, booking) -> dict:
     subcat = subcategory.get_subcategory_by_id(db, booking.subcategory_id)
     user = db.query(User).filter(User.id == booking.user_id).first()
     
+    vendor = db.query(Vendor).filter(Vendor.id == booking.serviceprovider_id).first()
+    
+    # Determine vendor name display
+    vendor_name = "Unknown Provider"
+    if vendor:
+        if vendor.full_name:
+            vendor_name = vendor.full_name
+        elif vendor.email:
+             vendor_name = vendor.email
+        elif vendor.phone:
+            vendor_name = vendor.phone
+        else:
+            vendor_name = f"Provider #{vendor.id}"
+
     booking_dict = {
         "id": booking.id,
         "user_id": booking.user_id,
@@ -84,6 +98,7 @@ def enrich_booking(db: Session, booking) -> dict:
         "otp": booking.otp,
         "created_at": booking.created_at.isoformat() if booking.created_at else None,
         "user_name": user.name if user else "Unknown User",
+        "service_provider_name": vendor_name,
         "category_name": cat.name if cat else None,
         "subcategory_name": subcat.name if subcat else None,
         "service_name": subcat.name if subcat else None,
@@ -172,17 +187,25 @@ def get_all_bookings_admin(
 
         # Get vendor IDs that match the search
         vendor_ids = db.query(Vendor.id).filter(
-            Vendor.name.ilike(f"%{search}%")
+            or_(
+                Vendor.full_name.ilike(f"%{search}%"),
+                Vendor.email.ilike(f"%{search}%"),
+                Vendor.phone.ilike(f"%{search}%")
+            )
         ).subquery()
 
-        query = query.filter(
-            or_(
-                Booking.user_id.in_(user_ids),
-                Booking.serviceprovider_id.in_(vendor_ids),
-                Booking.address.ilike(f"%{search}%"),
-                Booking.id == search  # Allow searching by booking ID
-            )
-        )
+        # Build list of conditions
+        conditions = [
+            Booking.user_id.in_(user_ids),
+            Booking.serviceprovider_id.in_(vendor_ids),
+            Booking.address.ilike(f"%{search}%")
+        ]
+        
+        # Add booking ID search if numeric
+        if search.isdigit():
+            conditions.append(Booking.id == int(search))
+
+        query = query.filter(or_(*conditions))
 
     # Get total count for pagination
     total = query.count()
