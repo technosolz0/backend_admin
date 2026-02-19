@@ -581,6 +581,78 @@ def refresh_vendor_token(
         )
 
 
+# =================== DEVICE / LOCATION UPDATE ENDPOINT ===================
+
+@router.put("/device/update")
+def update_device_details(
+    vendor_id: int = Body(...),
+    fcm_token: Optional[str] = Body(None),
+    latitude: Optional[float] = Body(None),
+    longitude: Optional[float] = Body(None),
+    device_name: Optional[str] = Body(None),
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """
+    Update vendor device details: FCM token, GPS location, and device name.
+    Called after login to keep vendor location and notification token up-to-date.
+    """
+    import datetime
+
+    try:
+        if current_vendor.id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this vendor's device details"
+            )
+
+        vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendor not found"
+            )
+
+        # Update only provided fields
+        if fcm_token is not None:
+            vendor.new_fcm_token = fcm_token
+        if latitude is not None:
+            vendor.latitude = latitude
+        if longitude is not None:
+            vendor.longitude = longitude
+        if device_name is not None:
+            vendor.device_name = device_name
+
+        vendor.last_device_update = datetime.datetime.utcnow()
+
+        db.commit()
+        db.refresh(vendor)
+
+        logger.info(
+            f"Device details updated for vendor {vendor_id}: "
+            f"lat={latitude}, lon={longitude}, device={device_name}"
+        )
+
+        return {
+            "success": True,
+            "message": "Device details updated successfully",
+            "vendor_id": vendor_id,
+            "latitude": vendor.latitude,
+            "longitude": vendor.longitude,
+            "device_name": vendor.device_name,
+            "last_device_update": vendor.last_device_update.isoformat() if vendor.last_device_update else None
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error updating device details for vendor {vendor_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
 # =================== LOCATION-BASED VENDOR FILTERING ===================
 
 @router.get("/nearby/{category_id}/{subcategory_id}")
