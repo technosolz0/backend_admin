@@ -33,7 +33,8 @@ class Feedback(Base):
 
     admin = relationship(
         "User",
-        foreign_keys=[responded_by]
+        foreign_keys=[responded_by],
+        overlaps="admin_feedbacks"
     )
 
     vendor = relationship(
