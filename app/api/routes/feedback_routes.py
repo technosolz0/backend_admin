@@ -6,7 +6,8 @@ from app.core.security import get_db
 from ...models.feedback_model import Feedback
 from ...models.user import User
 from ...crud.feedback_crud import FeedbackCRUD
-from ...core.security import get_current_user, get_current_admin
+from ...core.security import get_current_user, get_current_admin, get_current_vendor
+from ...models.service_provider_model import ServiceProvider
 
 router = APIRouter()
 
@@ -66,6 +67,64 @@ def get_user_feedback(
         "total": len(feedback_list)
     }
 
+# Vendor routes
+@router.post("/vendor")
+def submit_vendor_feedback(
+    subject: str,
+    message: str,
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """Submit feedback (for vendors)"""
+    try:
+        feedback_crud = FeedbackCRUD(db)
+        feedback = feedback_crud.create_feedback(
+            vendor_id=current_vendor.id,
+            subject=subject,
+            message=message,
+            category=category,
+            is_user=False,
+            is_vendor=True
+        )
+
+        return {
+            "message": "Vendor feedback submitted successfully",
+            "feedback_id": feedback.id
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit vendor feedback: {str(e)}")
+
+@router.get("/vendor/my-feedback")
+def get_vendor_own_feedback(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """Get vendor's own feedback"""
+    feedback_crud = FeedbackCRUD(db)
+    feedback_list = feedback_crud.get_feedback_by_vendor(current_vendor.id, skip=skip, limit=limit)
+
+    return {
+        "feedback": [
+            {
+                "id": f.id,
+                "subject": f.subject,
+                "message": f.message,
+                "category": f.category,
+                "is_resolved": f.is_resolved,
+                "admin_response": f.admin_response,
+                "responded_at": f.responded_at.isoformat() if f.responded_at else None,
+                "created_at": f.created_at.isoformat(),
+                "updated_at": f.updated_at.isoformat()
+            }
+            for f in feedback_list
+        ],
+        "total": len(feedback_list)
+    }
+
 # Admin routes
 @router.get("/admin/all")
 def get_all_feedback(
@@ -90,8 +149,11 @@ def get_all_feedback(
             {
                 "id": f.id,
                 "user_id": f.user_id,
-                "user_name": f.user.name if f.user else "Unknown",
-                "user_email": f.user.email if f.user else "Unknown",
+                "vendor_id": f.vendor_id,
+                "is_user": f.is_user,
+                "is_vendor": f.is_vendor,
+                "user_name": f.user.name if f.is_user and f.user else (f.vendor.full_name if f.is_vendor and f.vendor else "Unknown"),
+                "user_email": f.user.email if f.is_user and f.user else (f.vendor.email if f.is_vendor and f.vendor else "Unknown"),
                 "subject": f.subject,
                 "message": f.message,
                 "category": f.category,
@@ -123,8 +185,11 @@ def get_feedback_detail(
     return {
         "id": feedback.id,
         "user_id": feedback.user_id,
-        "user_name": feedback.user.name if feedback.user else "Unknown",
-        "user_email": feedback.user.email if feedback.user else "Unknown",
+        "vendor_id": feedback.vendor_id,
+        "is_user": feedback.is_user,
+        "is_vendor": feedback.is_vendor,
+        "user_name": feedback.user.name if feedback.is_user and feedback.user else (feedback.vendor.full_name if feedback.is_vendor and feedback.vendor else "Unknown"),
+        "user_email": feedback.user.email if feedback.is_user and feedback.user else (feedback.vendor.email if feedback.is_vendor and feedback.vendor else "Unknown"),
         "subject": feedback.subject,
         "message": feedback.message,
         "category": feedback.category,

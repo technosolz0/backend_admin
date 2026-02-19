@@ -8,7 +8,10 @@ class Feedback(Base):
     __tablename__ = "feedbacks"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=True)
+    is_user = Column(Boolean, default=True)
+    is_vendor = Column(Boolean, default=False)
     subject = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     category = Column(String(100), nullable=True)  # e.g., "bug", "feature", "general", "complaint"
@@ -31,6 +34,11 @@ class Feedback(Base):
     admin = relationship(
         "User",
         foreign_keys=[responded_by]
+    )
+
+    vendor = relationship(
+        "ServiceProvider",
+        foreign_keys=[vendor_id]
     )
 
 

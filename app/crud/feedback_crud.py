@@ -8,11 +8,18 @@ class FeedbackCRUD:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_feedback(self, user_id: int, subject: str, message: str,
+    def create_feedback(self, subject: str, message: str,
+                       user_id: Optional[int] = None,
+                       vendor_id: Optional[int] = None,
+                       is_user: bool = True,
+                       is_vendor: bool = False,
                        category: Optional[str] = None) -> Feedback:
         """Create a new feedback entry"""
         feedback = Feedback(
             user_id=user_id,
+            vendor_id=vendor_id,
+            is_user=is_user,
+            is_vendor=is_vendor,
             subject=subject,
             message=message,
             category=category
@@ -33,7 +40,11 @@ class FeedbackCRUD:
 
     def get_feedback_by_user(self, user_id: int, skip: int = 0, limit: int = 50) -> List[Feedback]:
         """Get feedback submitted by a specific user"""
-        return self.db.query(Feedback).filter(Feedback.user_id == user_id).offset(skip).limit(limit).all()
+        return self.db.query(Feedback).filter(Feedback.user_id == user_id, Feedback.is_user == True).offset(skip).limit(limit).all()
+
+    def get_feedback_by_vendor(self, vendor_id: int, skip: int = 0, limit: int = 50) -> List[Feedback]:
+        """Get feedback submitted by a specific vendor"""
+        return self.db.query(Feedback).filter(Feedback.vendor_id == vendor_id, Feedback.is_vendor == True).offset(skip).limit(limit).all()
 
     def get_unresolved_feedback(self, skip: int = 0, limit: int = 50) -> List[Feedback]:
         """Get unresolved feedback"""
