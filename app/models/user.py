@@ -1,3 +1,4 @@
+# NEW_NAME: user_model.py
 
 from sqlalchemy import Column, Integer, String, Enum, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship

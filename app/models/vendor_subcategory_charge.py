@@ -1,4 +1,4 @@
-
+# NEW_NAME: vendor_subcategory_charge_model.py
 from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base

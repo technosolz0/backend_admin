@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.core.security import create_access_token, get_current_user, get_db
 from app.schemas import user_schema
-from app.crud import user as crud_user
+from app.crud import user_crud as crud_user
 from app.models.user import User
 from app.core.dependencies import get_super_admin
 import logging
@@ -304,7 +304,7 @@ def get_current_user_data(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="We couldn't find your profile. Please log in again."
         )
     logger.info(f"User data retrieved for user ID: {current_user.id}")
     return user
@@ -447,7 +447,7 @@ def list_users(
     return {
         "success": True,
         "message": f"Retrieved {len(users)} users",
-        "users": [user_schema.UserOut.from_orm(user) for user in users],
+        "users": [user_schema.UserOut.model_validate(user) for user in users],
         "total": total,
         "page": (skip // limit) + 1,
         "limit": limit,
@@ -470,7 +470,7 @@ def get_user_by_id(
         logger.error(f"User {current_user.id} attempted unauthorized access to user {user_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to access this user's information"
+            detail="You are not authorized to access this account's information."
         )
     
     user = crud_user.get_user_by_id(db, user_id)
@@ -478,7 +478,7 @@ def get_user_by_id(
         logger.error(f"User not found: {user_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="The requested user profile could not be found."
         )
     
     logger.info(f"User data retrieved for user ID: {user_id}")
@@ -517,14 +517,14 @@ def update_user(
         logger.error(f"User {current_user.id} attempted unauthorized update of user {user_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized to update this user"
+            detail="You don't have permission to update this account."
         )
     
     if data.is_superuser is not None and not current_user.is_superuser:
         logger.error(f"User {current_user.id} attempted to update is_superuser")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superusers can update superuser status"
+            detail="Only admin users can modify administrative roles."
         )
     
     result = crud_user.update_user(
@@ -545,7 +545,7 @@ def update_user(
     return {
         "success": True,
         "message": result["message"],
-        "user": user_schema.UserOut.from_orm(result["data"])
+        "user": user_schema.UserOut.model_validate(result["data"])
     }
 
 
@@ -565,7 +565,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     return {
         "success": True,
         "message": result["message"],
-        "user": user_schema.UserOut.from_orm(result["data"])
+        "user": user_schema.UserOut.model_validate(result["data"])
     }
 
 
@@ -599,7 +599,7 @@ def refresh_access_token(
         if payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type"
+                detail="The provided token type is invalid. Please log in again."
             )
 
         email = payload.get("sub")
@@ -608,7 +608,7 @@ def refresh_access_token(
         if not email:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
+                detail="Your session is invalid. Please log in again."
             )
 
         # Verify user still exists and is active
@@ -620,14 +620,14 @@ def refresh_access_token(
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
+                detail="We couldn't find your account. Please register or log in again."
             )
 
         # Check if user is active (for regular users)
         if hasattr(user, 'status') and user.status.value != 'active':
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account is not active"
+                detail="Your account is currently inactive. Please contact support."
             )
 
         # Generate new access token
@@ -647,12 +647,12 @@ def refresh_access_token(
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token has expired"
+            detail="Your session has expired. Please log in again to continue."
         )
     except jwt.JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+            detail="The session token is invalid. Please log in securely."
         )
 
 
@@ -671,7 +671,7 @@ def get_vendors_and_charges(
         logger.error(f"Category or subcategory not found: cat={category_id}, subcat={subcategory_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category or subcategory not found"
+            detail="The selected category or service could not be found."
         )
 
     if data == []:

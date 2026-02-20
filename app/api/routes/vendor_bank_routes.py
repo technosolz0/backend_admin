@@ -210,7 +210,7 @@ from app.schemas.service_provider_schema import BankAccountCreate, BankAccountOu
 from app.crud import vendor_bank_crud
 from app.database import SessionLocal
 from app.core.security import get_current_vendor
-# from app.core.security import get_current_admin  # Add your admin auth
+from app.core.security import get_current_admin
 
 logger = logging.getLogger(__name__)
 
@@ -492,7 +492,7 @@ async def upload_bank_document(
 @router.get("/admin/accounts/pending", response_model=List[BankAccountOut], tags=["admin-bank-verification"])
 def admin_get_pending_bank_accounts(
     db: Session = Depends(get_db),
-    # current_admin = Depends(get_current_admin)  # Add admin auth
+    current_admin = Depends(get_current_admin)
 ):
     """
     Get all unverified bank accounts (Admin only)
@@ -524,7 +524,7 @@ def admin_get_all_bank_accounts(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    # current_admin = Depends(get_current_admin)
+    current_admin = Depends(get_current_admin)
 ):
     """
     Get all bank accounts with optional filters (Admin only)
@@ -558,7 +558,7 @@ def admin_get_all_bank_accounts(
 def admin_get_bank_account_details(
     account_id: int,
     db: Session = Depends(get_db),
-    # current_admin = Depends(get_current_admin)
+    current_admin = Depends(get_current_admin)
 ):
     """
     Get specific bank account details (Admin only)
@@ -584,7 +584,7 @@ def admin_verify_bank_account(
     account_id: int,
     verification_data: BankVerificationRequest,
     db: Session = Depends(get_db),
-    # current_admin = Depends(get_current_admin)
+    current_admin = Depends(get_current_admin)
 ):
     """
     Verify or reject bank account verification (Admin only)
@@ -624,7 +624,7 @@ def admin_verify_bank_account(
 @router.get("/admin/accounts/stats/verification", tags=["admin-bank-verification"])
 def admin_get_verification_stats(
     db: Session = Depends(get_db),
-    # current_admin = Depends(get_current_admin)
+    current_admin = Depends(get_current_admin)
 ):
     """
     Get bank account verification statistics (Admin only)

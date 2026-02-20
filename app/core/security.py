@@ -9,7 +9,7 @@ from typing import Union
 import os
 
 from app.database import SessionLocal
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.models.service_provider_model import ServiceProvider
 
 # 🔐 Security Setup
@@ -92,6 +92,13 @@ def get_current_identity(
         if vendor is None:
             print(f"Vendor not found for email: {email}")
             raise credentials_exception
+            
+        if vendor.status in ['rejected', 'inactive']:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been deactivated."
+            )
+            
         return vendor
     elif role == 'admin':
         user = db.query(User).filter(User.email == email).first()
@@ -101,12 +108,26 @@ def get_current_identity(
         if not user.is_superuser:
             print(f"User {email} is not a superuser")
             raise credentials_exception
+            
+        if user.status == UserStatus.blocked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been blocked."
+            )
+            
         return user
     else:  # default to user (role == 'user' or None)
         user = db.query(User).filter(User.email == email).first()
         if user is None:
             print(f"User not found for email: {email}")
             raise credentials_exception
+            
+        if user.status == UserStatus.blocked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been blocked."
+            )
+            
         return user
 
 # Legacy: get_current_user (for user-only routes)
@@ -178,4 +199,12 @@ def get_current_admin(
             detail="Admin access required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        
+    if user.status == UserStatus.blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been blocked.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
     return user

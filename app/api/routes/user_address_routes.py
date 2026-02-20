@@ -4,7 +4,7 @@ from typing import List
 from app.core.security import get_current_user, get_db
 from app.models.user import User
 from app.schemas import user_address_schema
-from app.crud import user_address as crud_address
+from app.crud import user_address_crud as crud_address
 
 router = APIRouter(prefix="/user", tags=["User Address"])
 

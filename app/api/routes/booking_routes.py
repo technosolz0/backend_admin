@@ -13,7 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.security import get_current_admin, get_db, get_current_user, get_current_vendor, SECRET_KEY, ALGORITHM, get_current_identity  # Use unified
 from app.schemas.booking_schema import BookingCreate, BookingOut, BookingStatusUpdate
 from app.schemas.payment_schema import PaymentCreate, PaymentOut
-from app.crud import booking_crud, payment_crud, category, subcategory, user as user_crud, service_provider_crud as vendor_crud
+from app.crud import booking_crud, payment_crud, category_crud as category, subcategory_crud as subcategory, user_crud, service_provider_crud as vendor_crud
 from app.models.booking_model import Booking, BookingStatus
 from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
