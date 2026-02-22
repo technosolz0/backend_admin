@@ -946,3 +946,28 @@ def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> Vendo
     db.refresh(vendor)
     
     return build_vendor_response(db, vendor)
+
+def change_vendor_password(db: Session, vendor_id: int, old_password: str, new_password: str) -> Dict[str, Any]:
+    """Change vendor password."""
+    try:
+        vendor = get_vendor_by_id(db, vendor_id)
+        if not vendor:
+            logger.warning(f"Password change attempt for non-existent vendor: {vendor_id}")
+            return {"success": False, "message": "Vendor not found."}
+        
+        if not verify_password(old_password, vendor.password):
+            logger.warning(f"Incorrect current password attempt for vendor: {vendor_id}")
+            return {"success": False, "message": "Incorrect current password."}
+        
+        vendor.password = get_password_hash(new_password)
+        db.commit()
+        logger.info(f"Password changed successfully for vendor: {vendor_id}")
+        return {"success": True, "message": "Password changed successfully."}
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error changing password for vendor {vendor_id}: {str(e)}")
+        return {"success": False, "message": f"Database error: {str(e)}"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error changing password for vendor {vendor_id}: {str(e)}")
+        return {"success": False, "message": "Internal server error."}

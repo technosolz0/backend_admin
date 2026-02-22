@@ -9,14 +9,16 @@ from app.models.category import Category
 from app.models.sub_category import SubCategory
 from app.schemas.service_provider_schema import (
     PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
-    AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest
+    AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest,
+    VendorChangePasswordRequest
 )
 from app.core.security import create_access_token, get_current_vendor, get_db
 from app.crud.service_provider_crud import (
     create_vendor, verify_vendor_otp, resend_otp,
     update_vendor_address, update_vendor_bank, update_vendor_work, 
     update_vendor_documents, change_vendor_admin_status, change_vendor_work_status, 
-    vendor_login, get_all_vendors, delete_vendor, build_vendor_response
+    vendor_login, get_all_vendors, delete_vendor, build_vendor_response,
+    change_vendor_password
 )
 from app.schemas.category_schema import CategoryOut
 from app.schemas.sub_category_schema import SubCategoryOut
@@ -164,6 +166,33 @@ def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db
         "refresh_token": refresh_token,  # ✅ Add refresh token
         "token_type": "bearer",
         "vendor": vendor
+    }
+
+
+# =================== PASSWORD MANAGEMENT ===================
+
+@router.post("/change-password", response_model=dict, status_code=status.HTTP_200_OK)
+def change_password_endpoint(
+    data: VendorChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """
+    Change vendor password.
+    """
+    result = change_vendor_password(db, current_vendor.id, data.old_password, data.new_password)
+    
+    if not result["success"]:
+        logger.error(f"Vendor password change failed for {current_vendor.email}: {result['message']}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["message"]
+        )
+    
+    logger.info(f"Vendor password changed successfully: {current_vendor.email}")
+    return {
+        "success": True,
+        "message": result["message"]
     }
 
 
