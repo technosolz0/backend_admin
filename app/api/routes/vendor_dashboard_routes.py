@@ -462,4 +462,4 @@ def get_vendor_dashboard(
 
     except Exception as e:
         logger.error(f"Error generating vendor dashboard: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="We're having trouble loading your dashboard right now. Please try again later.")

@@ -59,7 +59,7 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
             logger.warning(f"Registration attempt with existing verified email: {user.email}")
             return {
                 "success": False,
-                "message": "This email is already registered. Please login instead.",
+                "message": "This email is already registered with us. Please log in to your account.",
                 "data": None
             }
 
@@ -146,7 +146,7 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
         logger.exception(f"Database error in create_user_with_otp: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again later.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -154,7 +154,7 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
         logger.exception(f"Unexpected error in create_user_with_otp: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while processing your request. Please try again.",
             "data": None
         }
 
@@ -170,7 +170,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"OTP verification attempt for non-existent email: {email}")
             return {
                 "success": False,
-                "message": "User not found with this email.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -178,7 +178,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"OTP verification attempt for already verified user: {email}")
             return {
                 "success": False,
-                "message": "Your account is already verified. Please login.",
+                "message": "Your account is already verified! You can log in now.",
                 "data": None
             }
         
@@ -186,7 +186,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"OTP verification attempt but no OTP exists for: {email}")
             return {
                 "success": False,
-                "message": "No OTP found. Please request a new OTP.",
+                "message": "No active OTP found for this account. Please request a new one.",
                 "data": None
             }
         
@@ -194,7 +194,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"Invalid OTP attempt for email: {email}")
             return {
                 "success": False,
-                "message": "Invalid OTP. Please check and try again.",
+                "message": "The OTP you entered is incorrect. Double-check and try again.",
                 "data": None
             }
 
@@ -204,7 +204,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"Expired OTP attempt for email: {email}")
             return {
                 "success": False,
-                "message": "OTP has expired. Please request a new OTP.",
+                "message": "This OTP has expired. Please request a new one.",
                 "data": None
             }
 
@@ -234,7 +234,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         logger.exception(f"Database error in verify_otp: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -242,7 +242,7 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in verify_otp: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while verifying your OTP. Please try again.",
             "data": None
         }
 
@@ -256,7 +256,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"OTP resend attempt for non-existent email: {email}")
             return {
                 "success": False,
-                "message": "User not found with this email.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -264,7 +264,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"OTP resend attempt for already verified user: {email}")
             return {
                 "success": False,
-                "message": "Your account is already verified. Please login.",
+                "message": "Your account is already verified! You can log in now.",
                 "data": None
             }
 
@@ -293,7 +293,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Database error in resend_otp: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -301,7 +301,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in resend_otp: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while resending your OTP. Please try again.",
             "data": None
         }
 
@@ -330,7 +330,7 @@ def authenticate_user(
             logger.warning(f"Login attempt with non-existent email: {email}")
             return {
                 "success": False,
-                "message": "No account found with this email address. Please register first.",
+                "message": "We couldn't find an account with this email. Please check the email or register.",
                 "data": None
             }
         
@@ -339,7 +339,7 @@ def authenticate_user(
             logger.warning(f"Login attempt with unverified email: {email}")
             return {
                 "success": False,
-                "message": "Your email is not verified. Please verify your email using the OTP sent during registration.",
+                "message": "Your email is not verified yet. Please check your inbox for the OTP we sent you.",
                 "data": None
             }
         
@@ -357,7 +357,7 @@ def authenticate_user(
             logger.warning(f"Login attempt with incorrect password for: {email}")
             return {
                 "success": False,
-                "message": "Incorrect password. Please try again or reset your password.",
+                "message": "The password you entered is incorrect. Double-check and try again.",
                 "data": None
             }
 
@@ -390,7 +390,7 @@ def authenticate_user(
         logger.exception(f"Database error in authenticate_user: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -398,7 +398,7 @@ def authenticate_user(
         logger.exception(f"Unexpected error in authenticate_user: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong during login. Please try again.",
             "data": None
         }
 
@@ -414,7 +414,7 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"Password reset request for non-existent email: {email}")
             return {
                 "success": False,
-                "message": "No account found with this email address.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -422,7 +422,7 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"Password reset request for unverified user: {email}")
             return {
                 "success": False,
-                "message": "Your email is not verified. Please verify your email first.",
+                "message": "Your email is not verified yet. Please check your inbox for the OTP we sent you.",
                 "data": None
             }
 
@@ -450,7 +450,7 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Database error in request_password_reset: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -458,7 +458,7 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in request_password_reset: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while processing your request. Please try again.",
             "data": None
         }
 
@@ -472,7 +472,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
             logger.warning(f"Password reset confirmation for non-existent email: {email}")
             return {
                 "success": False,
-                "message": "User not found with this email.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -480,7 +480,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
             logger.warning(f"Password reset confirmation but no OTP exists for: {email}")
             return {
                 "success": False,
-                "message": "No OTP found. Please request a password reset first.",
+                "message": "No active password reset request found. Please request a new one.",
                 "data": None
             }
         
@@ -488,7 +488,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
             logger.warning(f"Invalid OTP for password reset: {email}")
             return {
                 "success": False,
-                "message": "Invalid OTP. Please check and try again.",
+                "message": "The OTP you entered is incorrect. Double-check and try again.",
                 "data": None
             }
 
@@ -498,7 +498,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
             logger.warning(f"Expired OTP for password reset: {email}")
             return {
                 "success": False,
-                "message": "OTP has expired. Please request a new password reset.",
+                "message": "This OTP has expired. Please request a new password reset.",
                 "data": None
             }
 
@@ -521,7 +521,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
         logger.exception(f"Database error in confirm_password_reset: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -529,7 +529,7 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
         logger.exception(f"Unexpected error in confirm_password_reset: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while resetting your password. Please try again.",
             "data": None
         }
 
@@ -597,7 +597,7 @@ def update_user(
             logger.warning(f"Update attempt for non-existent user ID: {user_id}")
             return {
                 "success": False,
-                "message": "User not found.",
+                "message": "We couldn't find your profile. Please check if you're logged in correctly.",
                 "data": None
             }
 
@@ -662,7 +662,7 @@ def update_user(
         logger.exception(f"Database error in update_user: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -670,7 +670,7 @@ def update_user(
         logger.exception(f"Unexpected error in update_user: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while updating your profile. Please try again.",
             "data": None
         }
 
@@ -683,7 +683,7 @@ def toggle_user_status(db: Session, user_id: int) -> Dict[str, Any]:
             logger.warning(f"Status toggle attempt for non-existent user ID: {user_id}")
             return {
                 "success": False,
-                "message": "User not found.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -701,7 +701,7 @@ def toggle_user_status(db: Session, user_id: int) -> Dict[str, Any]:
         logger.exception(f"Database error in toggle_user_status: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
 

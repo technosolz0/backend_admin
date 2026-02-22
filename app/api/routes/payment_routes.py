@@ -657,12 +657,12 @@ def create_order(
         # Verify booking exists and belongs to user
         booking = booking_crud.get_booking_by_id(db, order.booking_id)
         if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
+            raise HTTPException(status_code=404, detail="We couldn't find the booking you're looking for.")
 
         if booking.user_id != user.id:
             raise HTTPException(
                 status_code=403,
-                detail="Unauthorized access to booking"
+                detail="You don't have permission to access that booking."
             )
 
         # Check if payment already exists for this booking
@@ -672,7 +672,7 @@ def create_order(
         if existing_payment and existing_payment.status == PaymentStatus.SUCCESS:
             raise HTTPException(
                 status_code=400,
-                detail="Payment already completed for this booking"
+                detail="The payment for this booking has already been completed."
             )
 
         # ✅ CRITICAL FIX: Convert rupees to paise for Razorpay
@@ -736,17 +736,17 @@ def create_order(
         if "Authentication failed" in str(e):
             raise HTTPException(
                 status_code=500,
-                detail="Razorpay authentication failed. Check API credentials."
+                detail="We're having trouble connecting to the payment system. Please try again later."
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Razorpay API error: {str(e)}"
+            detail="There was a problem with the payment request. Please check and try again."
         )
     except Exception as e:
         logger.error(f"Error creating Razorpay order: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create order: {str(e)}"
+            detail="We couldn't create your payment order. Please try again."
         )
 
 
@@ -767,13 +767,13 @@ def verify_payment(
         if not payment:
             raise HTTPException(
                 status_code=404,
-                detail="Payment record not found"
+                detail="We couldn't find a record for this payment."
             )
 
         # Verify user authorization
         booking = booking_crud.get_booking_by_id(db, payment.booking_id)
         if booking.user_id != user.id:
-            raise HTTPException(status_code=403, detail="Unauthorized access")
+            raise HTTPException(status_code=403, detail="You don't have permission to access this.")
 
         # Verify payment signature
         signature_params = {
@@ -812,14 +812,14 @@ def verify_payment(
             )
             raise HTTPException(
                 status_code=400,
-                detail="Payment signature verification failed"
+                detail="We couldn't verify this payment's authenticity. Please contact support."
             )
 
     except Exception as e:
         logger.error(f"Error verifying payment: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to verify payment"
+            detail="We experienced an issue verifying your payment. Please try again or check your recent payments."
         )
 
 
@@ -852,7 +852,7 @@ def get_my_payments(
         logger.error(f"Error retrieving user payments: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve payments"
+            detail="We couldn't load your payments history right now. Please try again later."
         )
 
 
@@ -872,7 +872,7 @@ def get_recent_payments(
         logger.error(f"Error retrieving recent payments: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve recent payments"
+            detail="We couldn't load your recent payments. Please try again later."
         )
 
 
@@ -915,7 +915,7 @@ def get_user_payment_analytics(
         logger.error(f"Error retrieving user payment analytics: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve payment analytics"
+            detail="We couldn't load your payment analytics right now. Please try again later."
         )
 
 
@@ -948,7 +948,7 @@ def get_vendor_earnings(
         logger.error(f"Error retrieving vendor payments: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve vendor payments"
+            detail="We couldn't load your earnings right now. Please try again later."
         )
 
 
@@ -991,7 +991,7 @@ def get_vendor_payment_analytics(
         logger.error(f"Error retrieving vendor payment analytics: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve payment analytics"
+            detail="We couldn't load your payment analytics right now. Please try again later."
         )
 
 
@@ -1034,7 +1034,7 @@ def get_vendor_monthly_revenue(
         logger.error(f"Error retrieving monthly revenue: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve monthly revenue"
+            detail="We couldn't load your monthly revenue right now. Please try again later."
         )
 
 
@@ -1063,7 +1063,7 @@ def get_vendor_payment_stats(
         logger.error(f"Error retrieving vendor payment stats: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to retrieve payment statistics"
+            detail="We couldn't load your payment statistics right now. Please try again later."
         )
 
 
@@ -1079,7 +1079,7 @@ def get_payment_details(
     payment = payment_crud.get_payment_by_id(db, payment_id)
     if not payment:
         logger.error(f"Payment not found for ID {payment_id}")
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this payment.")
 
     # Verify user authorization through booking
     booking = booking_crud.get_booking_by_id(db, payment.booking_id)
@@ -1087,7 +1087,7 @@ def get_payment_details(
         logger.warning(
             f"Unauthorized access to payment {payment_id} by user {user.id}"
         )
-        raise HTTPException(status_code=403, detail="Unauthorized access")
+        raise HTTPException(status_code=403, detail="You don't have permission to access these details.")
 
     logger.info(f"Payment retrieved successfully: ID {payment_id}")
     return payment
@@ -1104,18 +1104,18 @@ def get_payment_by_booking(
     booking = booking_crud.get_booking_by_id(db, booking_id)
     if not booking:
         logger.error(f"Booking not found for ID {booking_id}")
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise HTTPException(status_code=404, detail="We couldn't find the booking you requested.")
 
     if booking.user_id != user.id:
         logger.warning(
             f"Unauthorized access to booking {booking_id} by user {user.id}"
         )
-        raise HTTPException(status_code=403, detail="Unauthorized access")
+        raise HTTPException(status_code=403, detail="You don't have permission to access this booking's payment.")
 
     payment = payment_crud.get_payment_by_booking_id(db, booking_id)
     if not payment:
         logger.info(f"No payment found for booking ID {booking_id}")
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise HTTPException(status_code=404, detail="No payment was found for this booking.")
 
     logger.info(f"Payment retrieved successfully for booking ID {booking_id}")
     return payment
@@ -1136,13 +1136,13 @@ def get_razorpay_payment_details(
         if not payment:
             raise HTTPException(
                 status_code=404,
-                detail="Payment record not found"
+                detail="We couldn't find a record for this payment."
             )
 
         # Verify user authorization
         booking = booking_crud.get_booking_by_id(db, payment.booking_id)
         if booking.user_id != user.id:
-            raise HTTPException(status_code=403, detail="Unauthorized access")
+            raise HTTPException(status_code=403, detail="You don't have permission to access these details.")
 
         # Fetch details from Razorpay
         razorpay_payment = razorpay_client.payment.fetch(razorpay_payment_id)
@@ -1168,13 +1168,13 @@ def get_razorpay_payment_details(
         logger.error(f"Razorpay API error: {str(e)}")
         raise HTTPException(
             status_code=400,
-            detail=f"Razorpay API error: {str(e)}"
+            detail="There was a problem communicating with the payment gateway."
         )
     except Exception as e:
         logger.error(f"Error fetching payment details: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch payment details"
+            detail="We couldn't fetch your payment details. Please try again later."
         )
 
 
@@ -1199,7 +1199,7 @@ async def razorpay_webhook(
                 logger.warning("Invalid webhook signature received")
                 raise HTTPException(
                     status_code=400,
-                    detail="Invalid signature"
+                    detail="The secure signature for this webhook is invalid."
                 )
 
         # Parse webhook data
@@ -1263,7 +1263,7 @@ async def razorpay_webhook(
         logger.error(f"Error processing webhook: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Webhook processing failed"
+            detail="We couldn't process the webhook update at this time."
         )
 
 
@@ -1316,7 +1316,7 @@ def search_payments(
         logger.error(f"Error searching payments: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Failed to search payments"
+            detail="We couldn't complete your search right now. Please try again later."
         )
 
 
@@ -1331,18 +1331,18 @@ def get_failed_payment_details(
     """Get detailed failure information for a failed payment"""
     payment = payment_crud.get_payment_by_id(db, payment_id)
     if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this payment.")
 
     # Verify user authorization
     booking = booking_crud.get_booking_by_id(db, payment.booking_id)
     if booking.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Unauthorized access")
+        raise HTTPException(status_code=403, detail="You don't have permission to access these details.")
 
     failure_details = payment_crud.get_failed_payment_details(db, payment_id)
     if not failure_details:
         raise HTTPException(
             status_code=400,
-            detail="Payment is not in failed state or details not found"
+            detail="This payment doesn't appear to have failed, or no details are available."
         )
 
     return failure_details

@@ -1,4 +1,6 @@
+# # NEW_NAME: service_model.py
 # from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, JSON, Enum as SAEnum
 # from sqlalchemy.orm import relationship
 # from app.database import Base
 # # from app.models.service_provider_model import provider_services  # Ensure this exists and is imported

@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.crud import service_provider_crud as vendor_crud
 import logging
 
-from app.core.security import get_db  # Add your admin authentication dependency
+from app.core.security import get_db, get_current_admin
 from app.schemas.withdrawal_schema import WithdrawalOut, WithdrawalUpdate
 from app.crud import withdrawal_crud
 from app.models.withdrawal_model import WithdrawalStatus
@@ -14,18 +14,6 @@ from app.utils.fcm import send_notification
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/withdrawals", tags=["Admin - Withdrawals"])
-
-
-# TODO: Replace with your actual admin authentication
-def get_current_admin(db: Session = Depends(get_db)):
-    """Replace this with your actual admin authentication logic"""
-    # For now, returning a mock admin
-    class MockAdmin:
-        id = 1
-        email = "admin@serwex.com"
-    return MockAdmin()
-
-
 @router.get("/", response_model=List[WithdrawalOut], summary="Get All Withdrawals")
 def get_all_withdrawals(
     db: Session = Depends(get_db),
@@ -40,9 +28,13 @@ def get_all_withdrawals(
             db, status=status, skip=skip, limit=limit
         )
         return withdrawals
+        if not withdrawals:
+            # Note: the crud probably just returns an empty list, but in case it's caught
+            raise HTTPException(status_code=404, detail="No withdrawals found.")
+        return withdrawals
     except Exception as e:
         logger.error(f"Error fetching all withdrawals: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch withdrawals")
+        raise HTTPException(status_code=500, detail="We couldn't load the withdrawals list right now. Please try again later.")
 
 
 @router.get("/pending", response_model=List[WithdrawalOut], summary="Get Pending Withdrawals")
@@ -60,7 +52,7 @@ def get_pending_withdrawals(
         return withdrawals
     except Exception as e:
         logger.error(f"Error fetching pending withdrawals: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch pending withdrawals")
+        raise HTTPException(status_code=500, detail="We couldn't load the pending withdrawals right now. Please try again later.")
 
 
 @router.patch("/{withdrawal_id}/status", response_model=WithdrawalOut, summary="Update Withdrawal Status")
@@ -74,7 +66,7 @@ def update_withdrawal_status(
     withdrawal = withdrawal_crud.get_withdrawal_by_id(db, withdrawal_id)
 
     if not withdrawal:
-        raise HTTPException(status_code=404, detail="Withdrawal not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this withdrawal.")
 
     try:
         # Update withdrawal status
@@ -125,7 +117,7 @@ def update_withdrawal_status(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error updating withdrawal status: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to update withdrawal status")
+        raise HTTPException(status_code=500, detail="We couldn't update the withdrawal status. Please try again later.")
 
 
 @router.get("/stats", summary="Get Admin Withdrawal Statistics")
@@ -173,7 +165,7 @@ def get_admin_withdrawal_stats(
 
     except Exception as e:
         logger.error(f"Error fetching admin withdrawal stats: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch statistics")
+        raise HTTPException(status_code=500, detail="We couldn't load the withdrawal statistics right now. Please try again later.")
 
 
 @router.get("/{withdrawal_id}", response_model=WithdrawalOut, summary="Get Withdrawal Details")
@@ -186,6 +178,6 @@ def get_withdrawal_details(
     withdrawal = withdrawal_crud.get_withdrawal_by_id(db, withdrawal_id)
 
     if not withdrawal:
-        raise HTTPException(status_code=404, detail="Withdrawal not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this withdrawal.")
 
     return withdrawal

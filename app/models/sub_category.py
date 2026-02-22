@@ -1,4 +1,5 @@
 # app/models/sub_category.py
+# NEW_NAME: sub_category_model.py
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base

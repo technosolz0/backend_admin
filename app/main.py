@@ -25,8 +25,8 @@ from app.api.routes import (
     service_provider_routes,
     sub_category_routes,
     booking_routes,
-    payment_route,
-    user_address_router,
+    payment_routes,
+    user_address_routes,
     delete_request_routes,
     wallet_routes,
     vendor_earnings_routes,
@@ -105,8 +105,8 @@ app.include_router(category_routes.router, prefix="/api")
 app.include_router(sub_category_routes.router, prefix="/api")
 app.include_router(service_provider_routes.router, prefix="/api")
 app.include_router(booking_routes.router, prefix="/api")
-app.include_router(payment_route.router, prefix="/api")
-app.include_router(user_address_router.router, prefix="/api")
+app.include_router(payment_routes.router, prefix="/api")
+app.include_router(user_address_routes.router, prefix="/api")
 app.include_router(delete_request_routes.router, prefix="/api")
 app.include_router(wallet_routes.router, prefix="/api")
 app.include_router(vendor_earnings_routes.router, prefix="/api")

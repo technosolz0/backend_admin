@@ -47,13 +47,13 @@ def request_withdrawal(
         if withdrawal_data.amount > available_balance:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient balance. Available: ₹{available_balance:.2f}, Requested: ₹{withdrawal_data.amount:.2f}"
+                detail=f"You don't have enough funds. Your available balance is ₹{available_balance:.2f}."
             )
 
         if withdrawal_data.amount < 100:
             raise HTTPException(
                 status_code=400,
-                detail="Minimum withdrawal amount is ₹100"
+                detail="You must withdraw at least ₹100."
             )
 
         # Create withdrawal request
@@ -78,7 +78,7 @@ def request_withdrawal(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating withdrawal request: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create withdrawal request: {str(e)}")
+        raise HTTPException(status_code=500, detail="We couldn't process your withdrawal request. Please try again.")
 
 
 @router.get("/history", response_model=List[WithdrawalOut], summary="Get Withdrawal History")
@@ -97,7 +97,7 @@ def get_withdrawal_history(
         return withdrawals
     except Exception as e:
         logger.error(f"Error fetching withdrawal history: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch withdrawal history")
+        raise HTTPException(status_code=500, detail="We couldn't load your withdrawal history. Please try again later.")
 
 
 @router.get("/stats", response_model=WithdrawalStats, summary="Get Withdrawal Statistics")
@@ -111,7 +111,7 @@ def get_withdrawal_stats(
         return stats
     except Exception as e:
         logger.error(f"Error fetching withdrawal stats: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch withdrawal statistics")
+        raise HTTPException(status_code=500, detail="We couldn't load your withdrawal statistics. Please try again later.")
 
 
 @router.get("/balance", summary="Get Available Balance")
@@ -153,7 +153,7 @@ def get_available_balance(
 
     except Exception as e:
         logger.error(f"Error calculating balance: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to calculate balance: {str(e)}")
+        raise HTTPException(status_code=500, detail="We couldn't load your balance. Please try again later.")
 
 
 @router.get("/{withdrawal_id}", response_model=WithdrawalOut, summary="Get Withdrawal Details")
@@ -166,10 +166,10 @@ def get_withdrawal_details(
     withdrawal = withdrawal_crud.get_withdrawal_by_id(db, withdrawal_id)
 
     if not withdrawal:
-        raise HTTPException(status_code=404, detail="Withdrawal not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this withdrawal.")
 
     if withdrawal.vendor_id != vendor.id:
-        raise HTTPException(status_code=403, detail="Unauthorized access")
+        raise HTTPException(status_code=403, detail="You don't have permission to view these details.")
 
     return withdrawal
 
@@ -184,15 +184,15 @@ def cancel_withdrawal(
     withdrawal = withdrawal_crud.get_withdrawal_by_id(db, withdrawal_id)
 
     if not withdrawal:
-        raise HTTPException(status_code=404, detail="Withdrawal not found")
+        raise HTTPException(status_code=404, detail="We couldn't find a record for this withdrawal.")
 
     if withdrawal.vendor_id != vendor.id:
-        raise HTTPException(status_code=403, detail="Unauthorized access")
+        raise HTTPException(status_code=403, detail="You don't have permission to modify this withdrawal.")
 
     if withdrawal.status != WithdrawalStatus.PENDING:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot cancel withdrawal with status {withdrawal.status.value}"
+            detail="Only pending withdrawals can be cancelled."
         )
 
     try:

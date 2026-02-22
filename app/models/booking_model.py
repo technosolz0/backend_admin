@@ -17,7 +17,7 @@ class Booking(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    serviceprovider_id = Column(Integer, ForeignKey("service_providers.id"))
+    serviceprovider_id = Column(Integer, ForeignKey("service_providers.id"))  # NEW_NAME: service_provider_id
     category_id = Column(Integer, ForeignKey("categories.id"))
     subcategory_id = Column(Integer, ForeignKey("sub_categories.id"))
     scheduled_time = Column(DateTime, nullable=True)

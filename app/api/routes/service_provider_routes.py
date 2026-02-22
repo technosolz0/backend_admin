@@ -224,7 +224,7 @@ def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
         if not vendor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendor not found"
+                detail="The requested vendor profile could not be found."
             )
         vendor_response = build_vendor_response(db, vendor)
         return vendor_response
@@ -234,7 +234,7 @@ def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error retrieving vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We experienced an error retrieving the profile. Please try again."
         )
 
 
@@ -257,7 +257,7 @@ def update_address_details(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         update = AddressDetailsUpdate(
             address=address,
@@ -276,7 +276,7 @@ def update_address_details(
         logger.error(f"Error updating address for vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We couldn't update your address. Please try again later."
         )
 
 
@@ -297,7 +297,7 @@ def update_bank_details(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         update = BankDetailsUpdate(
             account_holder_name=account_holder_name,
@@ -316,7 +316,7 @@ def update_bank_details(
         logger.error(f"Error updating bank details for vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We couldn't update your bank details. Please try again later."
         )
 
 
@@ -332,7 +332,7 @@ def update_work_details(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         vendor = update_vendor_work(db, vendor_id, update)
         logger.info(f"Work details updated for vendor: {vendor_id}")
@@ -343,7 +343,7 @@ def update_work_details(
         logger.error(f"Error updating work details for vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We couldn't update your work details. Please try again later."
         )
 
 
@@ -359,7 +359,7 @@ def patch_work_details(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         vendor = update_vendor_work(db, vendor_id, update)
         logger.info(f"Work details patched for vendor: {vendor_id}")
@@ -370,7 +370,7 @@ def patch_work_details(
         logger.error(f"Error patching work details for vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We couldn't update your work details. Please try again later."
         )
 
 
@@ -389,7 +389,7 @@ def upload_documents(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         vendor = update_vendor_documents(
             db, vendor_id, profile_pic, identity_doc, bank_doc, address_doc
@@ -402,7 +402,7 @@ def upload_documents(
         logger.error(f"Error uploading documents for vendor {vendor_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="We couldn't upload your documents. Please try again later."
         )
 
 
@@ -418,7 +418,7 @@ def update_work_status(
         if current_vendor.id != vendor_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this vendor"
+                detail="You don't have permission to update this profile."
             )
         vendor = change_vendor_work_status(db, vendor_id, work_status)
         logger.info(f"Work status updated for vendor: {vendor_id}")

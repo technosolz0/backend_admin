@@ -198,7 +198,7 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         VendorBankAccount.created_at.desc()
     ).all()
     
-    bank_accounts_out = [BankAccountOut.from_orm(ba) for ba in bank_accounts]
+    bank_accounts_out = [BankAccountOut.model_validate(ba) for ba in bank_accounts]
 
     return VendorResponse(
         id=vendor.id,
@@ -249,7 +249,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
             logger.warning(f"Vendor registration attempt with existing verified email: {vendor.email}")
             return {
                 "success": False,
-                "message": "This email is already registered. Please login instead.",
+                "message": "This email is already registered with us. Please log in to your account.",
                 "data": None
             }
         
@@ -341,7 +341,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         logger.exception(f"Database error in create_vendor: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again later.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -349,7 +349,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in create_vendor: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while processing your request. Please try again.",
             "data": None
         }
 
@@ -431,7 +431,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"OTP verification attempt for already verified vendor: {email}")
             return {
                 "success": False,
-                "message": "Your account is already verified. Please login.",
+                "message": "Your account is already verified! You can log in now.",
                 "data": None
             }
         
@@ -439,7 +439,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"Maximum OTP attempts exceeded for: {email}")
             return {
                 "success": False,
-                "message": "Maximum OTP attempts exceeded. Please request a new OTP.",
+                "message": "You've exceeded the maximum attempts. Please request a new OTP to continue.",
                 "data": None
             }
         
@@ -447,7 +447,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"No OTP found for vendor: {email}")
             return {
                 "success": False,
-                "message": "No OTP found. Please request a new OTP.",
+                "message": "No active OTP found for this account. Please request a new one.",
                 "data": None
             }
         
@@ -457,16 +457,15 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
             logger.warning(f"Invalid OTP attempt for: {email} (Attempts: {vendor.otp_attempts})")
             return {
                 "success": False,
-                "message": f"Invalid OTP. {MAX_OTP_ATTEMPTS - vendor.otp_attempts} attempts remaining.",
+                "message": f"The OTP you entered is incorrect. You have {MAX_OTP_ATTEMPTS - vendor.otp_attempts} attempt(s) left.",
                 "data": None
             }
         
-        # Check OTP expiry
         if (datetime.utcnow() - vendor.otp_created_at) > timedelta(minutes=OTP_EXPIRY_MINUTES):
             logger.warning(f"Expired OTP attempt for: {email}")
             return {
                 "success": False,
-                "message": "OTP has expired. Please request a new OTP.",
+                "message": "This OTP has expired. Please request a new one.",
                 "data": None
             }
         
@@ -521,7 +520,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         logger.exception(f"Database error in verify_vendor_otp: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -529,7 +528,7 @@ def verify_vendor_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in verify_vendor_otp: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while verifying your OTP. Please try again.",
             "data": None
         }
 
@@ -543,7 +542,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"OTP resend attempt for non-existent email: {email}")
             return {
                 "success": False,
-                "message": "Vendor not found with this email.",
+                "message": "We couldn't find an account with this email. Please check and try again.",
                 "data": None
             }
         
@@ -551,7 +550,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"OTP resend attempt for already verified vendor: {email}")
             return {
                 "success": False,
-                "message": "Your account is already verified. Please login.",
+                "message": "Your account is already verified! You can log in now.",
                 "data": None
             }
         
@@ -571,7 +570,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
             logger.warning(f"Maximum OTP resend attempts exceeded for: {email}")
             return {
                 "success": False,
-                "message": "Maximum OTP resend attempts exceeded. Please try again later.",
+                "message": "You've exceeded the maximum resend attempts. Please try again later.",
                 "data": None
             }
         
@@ -601,7 +600,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Database error in resend_otp: {str(e)}")
         return {
             "success": False,
-            "message": "Database error occurred. Please try again.",
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
             "data": None
         }
     except Exception as e:
@@ -609,7 +608,7 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
         logger.exception(f"Unexpected error in resend_otp: {str(e)}")
         return {
             "success": False,
-            "message": f"An error occurred: {str(e)}",
+            "message": "Something went wrong while resending your OTP. Please try again.",
             "data": None
         }
 
@@ -628,7 +627,15 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
             logger.warning(f"Login attempt with non-existent email: {email}")
             return {
                 "success": False,
-                "message": "No account found with this email address. Please register first.",
+                "message": "We couldn't find an account with this email. Please check the email or register.",
+                "data": None
+            }
+            
+        if vendor.status in ['rejected', 'inactive']:
+            logger.warning(f"Login attempt by deactivated vendor: {email}")
+            return {
+                "success": False,
+                "message": "Your account has been deactivated or rejected. Please contact support.",
                 "data": None
             }
         
@@ -636,7 +643,7 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
             logger.warning(f"Login attempt with unverified email: {email}")
             return {
                 "success": False,
-                "message": "Your email is not verified. Please verify your email using the OTP sent during registration.",
+                "message": "Your email is not verified yet. Please check your inbox for the OTP we sent you.",
                 "data": None
             }
         
@@ -644,7 +651,7 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
             logger.warning(f"Login attempt with incorrect password for: {email}")
             return {
                 "success": False,
-                "message": "Incorrect password. Please try again or reset your password.",
+                "message": "The password you entered is incorrect. Double-check and try again.",
                 "data": None
             }
         
@@ -683,10 +690,10 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
 def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpdate) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
     
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
@@ -704,10 +711,10 @@ def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpd
 def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
     
     # ✅ Step 1: Update legacy fields (backward compatibility)
     for field, value in update.dict(exclude_unset=True).items():
@@ -746,20 +753,20 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
         logger.error(f"Vendor with ID {vendor_id} not found")
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
 
     if not vendor.otp_verified:
         logger.error(f"Vendor {vendor_id} not OTP verified")
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
 
     if not update.subcategory_charges:
         logger.error("No subcategory charges provided")
-        raise HTTPException(status_code=400, detail="At least one subcategory charge is required")
+        raise HTTPException(status_code=400, detail="Please select at least one service and its charge.")
 
     category = get_category_by_id(db, update.category_id)
     if not category:
         logger.error(f"Category {update.category_id} not found")
-        raise HTTPException(status_code=404, detail=f"Category {update.category_id} not found")
+        raise HTTPException(status_code=404, detail="Selected category is invalid or no longer exists.")
 
     try:
         logger.debug(f"Setting category_id: {update.category_id}")
@@ -775,14 +782,14 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
             logger.debug(f"Processing subcategory charge: {charge}")
             if charge.service_charge < 0:
                 logger.error(f"Negative service charge: {charge.service_charge}")
-                raise HTTPException(status_code=400, detail="Service charge cannot be negative")
+                raise HTTPException(status_code=400, detail="Service charge cannot be negative. Please enter a valid amount.")
             subcategory = get_subcategory_by_id(db, charge.subcategory_id)
             if not subcategory:
                 logger.error(f"Subcategory {charge.subcategory_id} not found")
-                raise HTTPException(status_code=404, detail=f"Subcategory {charge.subcategory_id} not found")
+                raise HTTPException(status_code=404, detail="One of the selected services is invalid or no longer exists.")
             if subcategory.category_id != update.category_id:
                 logger.error(f"Subcategory {charge.subcategory_id} does not belong to category {update.category_id}")
-                raise HTTPException(status_code=400, detail=f"Subcategory {charge.subcategory_id} does not belong to category {update.category_id}")
+                raise HTTPException(status_code=400, detail="The selected service does not belong to the chosen category.")
             if subcategory.status not in [SubCategoryStatus.active, SubCategoryStatus.inactive]:
                 logger.error(f"Invalid status for subcategory {charge.subcategory_id}: {subcategory.status}")
                 raise HTTPException(
@@ -824,10 +831,10 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
 def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile | None, identity_doc: UploadFile, bank_doc: UploadFile, address_doc: UploadFile) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
     
     allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf'}
     max_file_size = 5 * 1024 * 1024
@@ -838,10 +845,10 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
             ext = file.filename.split(".")[-1].lower() if file.filename else ""
             if ext not in allowed_extensions:
                 logger.error(f"Invalid file type for {prefix}: {ext}")
-                raise HTTPException(status_code=400, detail=f"Invalid {prefix} file type. Allowed: {', '.join(allowed_extensions)}")
+                raise HTTPException(status_code=400, detail=f"The {prefix} file type is not valid. Please upload one of: {', '.join(allowed_extensions)}")
             if file.size > max_file_size:
                 logger.error(f"{prefix} file too large: {file.size} bytes")
-                raise HTTPException(status_code=400, detail=f"{prefix} file too large. Max size: {max_file_size} bytes")
+                raise HTTPException(status_code=400, detail=f"The {prefix} file is too large. The maximum size is {max_file_size // (1024*1024)}MB.")
             
             file_path = Path(upload_base_dir) / subdir / f"{prefix}_{vendor_id}.{ext}"
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -851,7 +858,7 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
             return str(file_path)
         except Exception as e:
             logger.error(f"Error saving {prefix} file: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to save {prefix} file: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"We couldn't save your {prefix} file. Please try again.")
 
     try:
         if profile_pic:
@@ -885,10 +892,10 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
 def update_vendor_device(db: Session, vendor_id: int, update: VendorDeviceUpdate) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
     
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
@@ -902,10 +909,10 @@ def update_vendor_device(db: Session, vendor_id: int, update: VendorDeviceUpdate
 def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if status not in ['active', 'inactive']:
-        raise HTTPException(status_code=400, detail="Invalid admin status")
+        raise HTTPException(status_code=400, detail="The provided account status is invalid.")
     
     vendor.admin_status = status
     db.commit()
@@ -930,16 +937,16 @@ def change_vendor_admin_status(db: Session, vendor_id: int, status: str) -> Vend
 def change_vendor_work_status(db: Session, vendor_id: int, status: str) -> VendorResponse:
     vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
     if not vendor:
-        raise HTTPException(status_code=404, detail=f"Vendor with ID {vendor_id} not found")
+        raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
     
     if not vendor.otp_verified:
-        raise HTTPException(status_code=403, detail="OTP verification required")
+        raise HTTPException(status_code=403, detail="Please verify your email address to continue.")
     
     if vendor.admin_status != 'active':
-        raise HTTPException(status_code=403, detail="Vendor must be active to change work status")
+        raise HTTPException(status_code=403, detail="Your account must be active by an admin to change your work status.")
     
     if status not in ['work_on', 'work_off']:
-        raise HTTPException(status_code=400, detail="Invalid work status")
+        raise HTTPException(status_code=400, detail="The provided work status is invalid.")
     
     vendor.work_status = status
     db.commit()
