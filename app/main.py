@@ -15,7 +15,8 @@ from app.models import (
     booking_model,
     payment_model,
     user_address,
-    vendor_subcategory_charge
+    vendor_subcategory_charge,
+    help_center_model
 )
 
 from app.api.routes import (
@@ -36,6 +37,7 @@ from app.api.routes import (
     notification_routes,
     feedback_routes,
     review_routes,
+    help_center_routes,
 )
 
 # -------------------------
@@ -121,6 +123,7 @@ app.include_router(vendor_bank_routes.router, prefix="/api")
 app.include_router(notification_routes.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"])
+app.include_router(help_center_routes.router, prefix="/api/help-center", tags=["help-center"])
 
 # -------------------------
 # Custom OpenAPI with JWT
