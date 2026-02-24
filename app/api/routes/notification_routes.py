@@ -7,7 +7,7 @@ from ...models.notification_model import Notification, NotificationType, Notific
 from ...models.user import User
 from ...crud.notification_crud import NotificationCRUD
 from ...utils.fcm import send_push_notification
-from ...core.security import get_current_admin
+from ...core.security import get_current_admin, get_current_user
 
 router = APIRouter()
 
@@ -92,6 +92,55 @@ async def send_notifications_to_users(users: List[User], title: str, message: st
 
     print(f"Notification {notification_id} sent: {success_count} success, {failure_count} failures")
 
+@router.get("/my-notifications")
+def get_user_notifications(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get notifications for the current logged-in user"""
+    notification_crud = NotificationCRUD(db)
+    notifications = notification_crud.get_user_notifications(
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit
+    )
+
+    return {
+        "notifications": notifications,
+        "total": len(notifications)
+    }
+
+@router.get("/unread-count")
+def get_unread_notification_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the count of unread notifications for the current user"""
+    notification_crud = NotificationCRUD(db)
+    count = notification_crud.get_unread_count(user_id=current_user.id)
+
+    return {"unread_count": count}
+
+@router.patch("/{notification_id}/read")
+def mark_notification_as_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a notification as read for the current user"""
+    notification_crud = NotificationCRUD(db)
+    success = notification_crud.mark_as_read(
+        user_id=current_user.id,
+        notification_id=notification_id
+    )
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    return {"message": "Notification marked as read"}
+
 @router.get("/")
 def get_notifications(
     skip: int = 0,
@@ -99,7 +148,7 @@ def get_notifications(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ):
-    """Get all notifications"""
+    """Get all notifications (Admin only)"""
     notification_crud = NotificationCRUD(db)
     notifications = notification_crud.get_all_notifications(skip=skip, limit=limit)
 
@@ -128,7 +177,7 @@ def get_notification(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ):
-    """Get notification by ID"""
+    """Get notification by ID (Admin only)"""
     notification_crud = NotificationCRUD(db)
     notification = notification_crud.get_notification_by_id(notification_id)
 
@@ -154,7 +203,7 @@ def delete_notification(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ):
-    """Delete a notification"""
+    """Delete a notification (Admin only)"""
     notification_crud = NotificationCRUD(db)
     success = notification_crud.delete_notification(notification_id)
 
@@ -168,7 +217,7 @@ def get_notification_stats(
     db: Session = Depends(get_db),
     current_admin: User = Depends(get_current_admin)
 ):
-    """Get notification statistics"""
+    """Get notification statistics (Admin only)"""
     notification_crud = NotificationCRUD(db)
 
     total = len(notification_crud.get_all_notifications())
