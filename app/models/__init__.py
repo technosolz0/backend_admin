@@ -26,6 +26,7 @@ from .booking_model import Booking, BookingStatus
 from .payment_model import Payment
 from .notification_model import Notification, NotificationType, NotificationTarget
 from .feedback_model import Feedback
+from .report_model import Report
 from .review_model import Review
 
 from sqlalchemy.orm import configure_mappers

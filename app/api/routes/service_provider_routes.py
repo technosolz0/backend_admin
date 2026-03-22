@@ -1,6 +1,6 @@
 # app/api/service_provider_routes.py - Fixed with proper error handling
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -27,7 +27,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/vendor", tags=["vendor"])
+router = APIRouter(prefix="/vendor", tags=["Vendor"])
 
 
 # =================== REGISTRATION ENDPOINTS ===================
@@ -82,7 +82,14 @@ def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
     # ✅ Generate access token with role="vendor"
     access_token = create_access_token(
         data={"sub": vendor.email},
-        role="vendor"  # Important: Specify role for vendor authentication
+        role="vendor"
+    )
+    
+    # ✅ Generate refresh token (30 days)
+    refresh_token = create_access_token(
+        data={"sub": vendor.email},
+        token_type="refresh",
+        role="vendor"
     )
     
     logger.info(f"Vendor OTP verified successfully: {data.email}")
@@ -92,6 +99,7 @@ def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
         "vendor_id": vendor.id,
         "step": vendor.step,
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "vendor": vendor
     }
@@ -248,7 +256,7 @@ def update_address_details(
     city: str = Form(...),
     pincode: str = Form(...),
     address_doc_type: str = Form(...),
-    address_doc_number: str = Form(...),
+    address_doc_number: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
@@ -286,9 +294,9 @@ def update_bank_details(
     account_holder_name: str = Form(...),
     account_number: str = Form(...),
     ifsc_code: str = Form(...),
-    upi_id: str = Form(...),
+    upi_id: Optional[str] = Form(None),
     bank_doc_type: str = Form(...),
-    bank_doc_number: str = Form(...),
+    bank_doc_number: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_vendor: ServiceProvider = Depends(get_current_vendor)
 ):
@@ -435,7 +443,7 @@ def update_work_status(
 
 # =================== ADMIN ENDPOINTS ===================
 
-@router.get("/", response_model=PaginatedVendorsResponse)
+@router.get("", response_model=PaginatedVendorsResponse)
 def get_all_vendors_endpoint(
     db: Session = Depends(get_db),
     page: int = 1,
@@ -538,7 +546,7 @@ def refresh_vendor_token(
     - 401: Invalid or expired refresh token
     """
     from jose import jwt, JWTError, ExpiredSignatureError
-    from app.core.config import SECRET_KEY, ALGORITHM
+    from app.core.security import SECRET_KEY, ALGORITHM
 
     refresh_token = refresh_data.get("refresh_token")
 
@@ -590,11 +598,19 @@ def refresh_vendor_token(
             role="vendor"
         )
 
+        # Generate new refresh token (rotation)
+        new_refresh_token = create_access_token(
+            data={"sub": email},
+            token_type="refresh",
+            role="vendor"
+        )
+
         logger.info(f"Access token refreshed for vendor: {email}")
         return {
             "success": True,
             "message": "Access token refreshed successfully",
             "access_token": new_access_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
 
@@ -690,17 +706,19 @@ def get_nearby_vendors(
     subcategory_id: int,
     user_lat: float,
     user_lng: float,
+    user_pincode: Optional[str] = Query(None),
     radius_km: float = 5.0,  # Default 5km radius
     db: Session = Depends(get_db)
 ):
     """
-    Get vendors within specified radius of user's location.
+    Get vendors within specified radius of user's location OR matching user's PIN code.
 
     Parameters:
     - category_id: Service category ID
     - subcategory_id: Service subcategory ID
     - user_lat: User's latitude
     - user_lng: User's longitude
+    - user_pincode: User's pincode (Optional, for fallback matching)
     - radius_km: Search radius in kilometers (default: 5.0)
 
     Returns:
@@ -712,6 +730,9 @@ def get_nearby_vendors(
 
         def calculate_distance(lat1, lng1, lat2, lng2):
             """Calculate distance between two points using Haversine formula."""
+            if lat1 is None or lng1 is None or lat2 is None or lng2 is None:
+                return float('inf')
+            
             R = 6371  # Earth's radius in kilometers
 
             lat1_rad = math.radians(lat1)
@@ -723,18 +744,20 @@ def get_nearby_vendors(
             dlng = lng2_rad - lng1_rad
 
             a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlng/2)**2
-            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(max(0, 1-a)))
 
             return R * c
 
-        # Query vendors with the specified category and subcategory
-        vendors = db.query(ServiceProvider).filter(
-            ServiceProvider.category_id == category_id,
-            ServiceProvider.admin_status == 'active',
-            ServiceProvider.work_status == 'work_on',
-            ServiceProvider.latitude.isnot(None),
-            ServiceProvider.longitude.isnot(None)
+        # Only active, approved and online vendors
+        all_vendors_in_db = db.query(ServiceProvider).filter(
+            ServiceProvider.category_id == category_id
         ).all()
+        
+        logger.info(f"📍 Nearby Search: Found {len(all_vendors_in_db)} total vendors for category {category_id}")
+
+        vendors = [v for v in all_vendors_in_db if v.status == 'approved' and v.admin_status == 'active' and v.work_status == 'work_on']
+        
+        logger.info(f"📍 Nearby Search: {len(vendors)} vendors are approved, active, and ONLINE")
 
         nearby_vendors = []
 
@@ -745,9 +768,9 @@ def get_nearby_vendors(
                 if charge.subcategory_id == subcategory_id:
                     vendor_charges.append({
                         "subcategory_id": charge.subcategory_id,
-                        "subcategory_name": charge.subcategory_name,
-                        "price": charge.price,
-                        "description": charge.description
+                        "subcategory_name": charge.subcategory.name if charge.subcategory else "N/A",
+                        "price": charge.service_charge,
+                        "description": getattr(charge, 'description', '')
                     })
 
             # Skip vendor if no charges for this subcategory
@@ -757,358 +780,64 @@ def get_nearby_vendors(
             # Calculate distance
             distance = calculate_distance(
                 user_lat, user_lng,
-                float(vendor.latitude), float(vendor.longitude)
+                float(vendor.latitude) if vendor.latitude is not None else None, 
+                float(vendor.longitude) if vendor.longitude is not None else None
+                
             )
 
-            # Include vendor if within radius
-            if distance <= radius_km:
+            # Fallback for unknown location: show all relevant vendors
+            is_nearby = (distance <= radius_km)
+            is_same_pincode = (user_pincode and vendor.pincode == user_pincode)
+            location_unknown = (user_lat == 0.0 and user_lng == 0.0 and not user_pincode)
+
+            if location_unknown or is_nearby or is_same_pincode:
                 vendor_data = {
                     "id": vendor.id,
                     "full_name": vendor.full_name,
                     "email": vendor.email,
                     "phone": vendor.phone,
                     "profile_pic": vendor.profile_pic,
+                    "pincode": vendor.pincode,
                     "latitude": vendor.latitude,
                     "longitude": vendor.longitude,
-                    "distance_km": round(distance, 2),
-                    "rating": getattr(vendor, 'rating', 0.0),
-                    "total_reviews": getattr(vendor, 'total_reviews', 0),
-                    "experience_years": vendor.experience_years,
-                    "description": vendor.description,
+                    "distance_km": round(distance, 2) if distance != float('inf') else None,
                     "work_status": vendor.work_status,
                     "admin_status": vendor.admin_status,
                     "charges": vendor_charges
                 }
+                
+                # Dynamically handle model differences safely
+                for field in ['rating', 'total_reviews', 'experience_years', 'description']:
+                    if hasattr(vendor, field):
+                        vendor_data[field] = getattr(vendor, field)
+                
                 nearby_vendors.append(vendor_data)
 
-        # Sort by distance (closest first)
-        nearby_vendors.sort(key=lambda x: x['distance_km'])
+        # Sort by distance (closest first), placing those with distance None at the end
+        nearby_vendors.sort(key=lambda x: (x['distance_km'] is None, x['distance_km']))
 
-        logger.info(f"Found {len(nearby_vendors)} vendors within {radius_km}km of user location")
+        logger.info(f"Found {len(nearby_vendors)} vendors for user at location ({user_lat}, {user_lng}) and pincode {user_pincode}")
+
+        if not nearby_vendors:
+            return {
+                "success": True,
+                "count": 0,
+                "message": "Vendor Coming Soon in Your Area",
+                "vendors": []
+            }
 
         return {
             "success": True,
             "count": len(nearby_vendors),
-            "radius_km": radius_km,
-            "user_location": {"latitude": user_lat, "longitude": user_lng},
+            "message": "Vendors available in your area.",
             "vendors": nearby_vendors
         }
 
     except Exception as e:
-        logger.error(f"Error fetching nearby vendors: {str(e)}")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Error fetching nearby vendors: {str(e)}\n{error_trace}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            status_code=500,
+            detail=f"Error: {str(e)}"
         )
-
-# from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
-# from sqlalchemy.orm import Session
-# from typing import List, Optional
-# from app.models.service_provider_model import ServiceProvider
-# from app.models.category import Category
-# from app.models.sub_category import SubCategory
-# from app.schemas.service_provider_schema import (
-#     PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
-#     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest
-# )
-# from app.core.security import create_access_token, get_current_vendor
-# from app.crud.service_provider_crud import (
-#     create_vendor, verify_vendor_otp, resend_otp,
-#     update_vendor_address, update_vendor_bank, update_vendor_work, 
-#     update_vendor_documents, change_vendor_admin_status, change_vendor_work_status, 
-#     vendor_login, get_all_vendors, delete_vendor, build_vendor_response
-# )
-# from app.database import SessionLocal
-# from app.schemas.category_schema import CategoryOut
-# from app.schemas.sub_category_schema import SubCategoryOut
-# import logging
-
-# logging.basicConfig(level=logging.DEBUG)
-# logger = logging.getLogger(__name__)
-
-# router = APIRouter(prefix="/vendor", tags=["vendor"])
-
-# def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
-# def transform_vendor_for_frontend(vendor: VendorResponse, db: Session) -> dict:
-#     """Transform VendorResponse to frontend format"""
-#     return {
-#         "id": str(vendor.id),
-#         "name": vendor.full_name,
-#         "categoryId": str(vendor.category_id) if vendor.category_id else "",
-#         "categoryName": vendor.category_name or "N/A",
-#         "subcategoryId": str(vendor.subcategory_charges[0].subcategory_id) if vendor.subcategory_charges else "",
-#         "subcategoryName": vendor.subcategory_charges[0].subcategory_name if vendor.subcategory_charges else "N/A",
-#         "serviceId": str(vendor.subcategory_charges[0].subcategory_id) if vendor.subcategory_charges else "",
-#         "serviceName": vendor.subcategory_charges[0].subcategory_name if vendor.subcategory_charges else "N/A",
-#         "contactInfo": vendor.email or vendor.phone or "N/A",
-#         "status": vendor.admin_status.capitalize(),
-#         "step": vendor.step
-#     }
-
-# @router.get("/", response_model=PaginatedVendorsResponse)
-# def get_all_vendors_endpoint(
-#     db: Session = Depends(get_db),
-#     page: int = 1,
-#     limit: int = 10
-# ):
-#     try:
-#         vendors, total = get_all_vendors(db, page, limit)
-#         return {"vendors": vendors, "total": total}
-#     except Exception as e:
-#         logger.error(f"Error in get_all_vendors: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.delete("/{vendor_id}")
-# def delete_vendor_endpoint(
-#     vendor_id: int,
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             logger.warning(f"Unauthorized attempt to delete vendor {vendor_id} by vendor {current_vendor.id}")
-#             raise HTTPException(status_code=403, detail="Not authorized to delete this vendor")
-#         delete_vendor(db, vendor_id)
-#         logger.info(f"Vendor deleted successfully: ID {vendor_id}")
-#         return {"message": "Vendor deleted successfully"}
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error deleting vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.get("/categories", response_model=List[CategoryOut])
-# def list_all_categories(db: Session = Depends(get_db)):
-#     return db.query(Category).all()
-
-# @router.get("/subcategories", response_model=List[SubCategoryOut])
-# def get_subcategories(category_id: Optional[int] = None, db: Session = Depends(get_db)):
-#     query = db.query(SubCategory).filter(SubCategory.status == 'active')
-#     if category_id:
-#         query = query.filter(SubCategory.category_id == category_id)
-#     return query.all()
-
-# @router.post("/login", response_model=dict)
-# def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db)):
-#     try:
-#         vendor, message = vendor_login(db, data.email, data.password)
-#         token = create_access_token(
-#             data={"sub": vendor.email},  # only 'sub' here
-#             role="vendor"                # ✅ this ensures JWT has role=vendor
-#         )
-#         return {
-#             "access_token": token,
-#             "token_type": "bearer",
-#             "vendor": build_vendor_response(db, vendor),
-#             "message": message
-#         }
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Vendor login error: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.post("/register", response_model=dict)
-# def register_vendor(vendor: VendorCreate, db: Session = Depends(get_db)):
-#     try:
-#         db_vendor = create_vendor(db, vendor)
-#         return {"message": "OTP sent", "vendor_id": db_vendor.id, "step": db_vendor.step}
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Vendor registration error: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.post("/verify-otp", response_model=dict)
-# def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
-#     try:
-#         vendor, message = verify_vendor_otp(db, data.email, data.otp)
-#         if not vendor:
-#             raise HTTPException(status_code=400, detail=message)
-#         access_token = create_access_token(data={"sub": vendor.email})
-#         return {
-#             "message": message,
-#             "vendor_id": vendor.id,
-#             "step": vendor.step,
-#             "access_token": access_token,
-#             "vendor": vendor
-#         }
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"OTP verification error: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.post("/send-otp", response_model=dict)
-# def resend_otp_endpoint(data: OTPRequest, db: Session = Depends(get_db)):
-#     try:
-#         resend_otp(db, data.email)
-#         return {"message": "OTP resent"}
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"OTP resend error: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.get("/me", response_model=VendorResponse)
-# def get_me(current_vendor: ServiceProvider = Depends(get_current_vendor), db: Session = Depends(get_db)):
-#     try:
-#         vendor_response = build_vendor_response(db, current_vendor)
-#         return vendor_response
-#     except Exception as e:
-#         logger.error(f"Error retrieving vendor details: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.get("/{vendor_id}", response_model=VendorResponse)
-# def get_vendor_by_id(vendor_id: int, db: Session = Depends(get_db)):
-#     try:
-#         vendor = db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-#         if not vendor:
-#             raise HTTPException(status_code=404, detail="Vendor not found")
-#         vendor_response = build_vendor_response(db, vendor)
-#         return vendor_response
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error retrieving vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.put("/profile/address", response_model=VendorResponse)
-# def update_address_details(
-#     vendor_id: int = Form(...),
-#     address: str = Form(...),
-#     state: str = Form(...),
-#     city: str = Form(...),
-#     pincode: str = Form(...),
-#     address_doc_type: str = Form(...),
-#     address_doc_number: str = Form(...),
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             raise HTTPException(status_code=403, detail="Not authorized to update this vendor")
-#         update = AddressDetailsUpdate(
-#             address=address,
-#             state=state,
-#             city=city,
-#             pincode=pincode,
-#             address_doc_type=address_doc_type,
-#             address_doc_number=address_doc_number
-#         )
-#         vendor = update_vendor_address(db, vendor_id, update)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error updating address for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.put("/profile/bank", response_model=VendorResponse)
-# def update_bank_details(
-#     vendor_id: int = Form(...),
-#     account_holder_name: str = Form(...),
-#     account_number: str = Form(...),
-#     ifsc_code: str = Form(...),
-#     upi_id: str = Form(...),
-#     bank_doc_type: str = Form(...),
-#     bank_doc_number: str = Form(...),
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             raise HTTPException(status_code=403, detail="Not authorized to update this vendor")
-#         update = BankDetailsUpdate(
-#             account_holder_name=account_holder_name,
-#             account_number=account_number,
-#             ifsc_code=ifsc_code,
-#             upi_id=upi_id,
-#             bank_doc_type=bank_doc_type,
-#             bank_doc_number=bank_doc_number
-#         )
-#         vendor = update_vendor_bank(db, vendor_id, update)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error updating bank details for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.put("/profile/work", response_model=VendorResponse)
-# def update_work_details(
-#     vendor_id: int = Body(...),
-#     update: WorkDetailsUpdate = Body(...),
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             raise HTTPException(status_code=403, detail="Not authorized to update this vendor")
-#         vendor = update_vendor_work(db, vendor_id, update)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error updating work details for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.post("/profile/documents", response_model=VendorResponse)
-# def upload_documents(
-#     vendor_id: int = Form(...),
-#     profile_pic: UploadFile = File(None),
-#     identity_doc: UploadFile = File(...),
-#     bank_doc: UploadFile = File(...),
-#     address_doc: UploadFile = File(...),
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             raise HTTPException(status_code=403, detail="Not authorized to update this vendor")
-#         vendor = update_vendor_documents(db, vendor_id, profile_pic, identity_doc, bank_doc, address_doc)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error uploading documents for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.put("/profile/work-status", response_model=VendorResponse)
-# def update_work_status(
-#     vendor_id: int = Form(...),
-#     work_status: str = Form(..., pattern="^(work_on|work_off)$"),
-#     db: Session = Depends(get_db),
-#     current_vendor: ServiceProvider = Depends(get_current_vendor)
-# ):
-#     try:
-#         if current_vendor.id != vendor_id:
-#             raise HTTPException(status_code=403, detail="Not authorized to update this vendor")
-#         vendor = change_vendor_work_status(db, vendor_id, work_status)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error updating work status for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-# @router.put("/admin/status", response_model=VendorResponse)
-# def update_admin_status(
-#     vendor_id: int = Form(...),
-#     admin_status: str = Form(..., pattern="^(active|inactive)$"),
-#     db: Session = Depends(get_db)
-# ):
-#     try:
-#         vendor = change_vendor_admin_status(db, vendor_id, admin_status)
-#         return vendor
-#     except HTTPException as e:
-#         raise e
-#     except Exception as e:
-#         logger.error(f"Error updating admin status for vendor {vendor_id}: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")

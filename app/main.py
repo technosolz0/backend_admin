@@ -1,5 +1,4 @@
 
-
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,13 +34,17 @@ from app.api.routes import (
     withdrawal_routes, admin_withdrawal_routes,vendor_bank_routes,
     notification_routes,
     feedback_routes,
+    report_routes,
     review_routes,
+    referral_routes,
+    referral_stats_routes,
+    nearby_vendor_routes,
 )
 
 # -------------------------
 # Initialize FastAPI app
 # -------------------------
-app = FastAPI()
+app = FastAPI(strict_slashes=False)
 
 # Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -120,7 +123,15 @@ app.include_router(vendor_bank_routes.router, prefix="/api")
 # New feature routes
 app.include_router(notification_routes.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["feedback"])
+app.include_router(report_routes.router, prefix="/api", tags=["reports"])
 app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"])
+app.include_router(referral_routes.router, prefix="/api")
+app.include_router(referral_stats_routes.router, prefix="/api")
+
+# =============================================
+# Nearby Vendor + Live Location + Booking Flow
+# =============================================
+app.include_router(nearby_vendor_routes.router, prefix="/api", tags=["Nearby & Location"])
 
 # -------------------------
 # Custom OpenAPI with JWT

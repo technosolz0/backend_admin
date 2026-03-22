@@ -30,6 +30,7 @@ class NotificationType(str, Enum):
     booking_created = "booking_created"
     booking_accepted = "booking_accepted"
     booking_cancelled = "booking_cancelled"
+    booking_rejected = "booking_rejected"
     booking_completed = "booking_completed"
     otp_sent = "otp_sent"
     payment_created = "payment_created"
@@ -40,19 +41,23 @@ def send_booking_notification(
     notification_type: NotificationType,
     recipient: str,
     recipient_id: int,
-    fcm_token: Optional[str] = None
+    fcm_token: Optional[str] = None,
+    custom_message: Optional[str] = None
 ):
     """Helper function to send standardized booking notifications."""
-    messages = {
-        NotificationType.booking_created: f"Your booking #{booking.id} has been created successfully.",
-        NotificationType.booking_accepted: f"Your booking #{booking.id} has been accepted by the vendor.",
-        NotificationType.booking_cancelled: f"Your booking #{booking.id} has been cancelled.",
-        NotificationType.booking_completed: f"Your booking #{booking.id} has been completed.",
-        NotificationType.otp_sent: f"An OTP for booking #{booking.id} completion has been sent to your email.",
-        NotificationType.payment_created: f"Payment for booking #{booking.id} has been created."
-    }
-    
-    message = messages.get(notification_type, f"Booking #{booking.id} status updated to {notification_type.value}.")
+    if custom_message:
+        message = custom_message
+    else:
+        messages = {
+            NotificationType.booking_created: f"Your booking #{booking.id} has been created successfully.",
+            NotificationType.booking_accepted: f"Your booking #{booking.id} has been accepted by the vendor.",
+            NotificationType.booking_cancelled: f"Your booking #{booking.id} has been cancelled.",
+            NotificationType.booking_rejected: f"Your booking #{booking.id} has been rejected by the service provider.",
+            NotificationType.booking_completed: f"Your booking #{booking.id} has been completed.",
+            NotificationType.otp_sent: f"An OTP for booking #{booking.id} completion has been sent to your email.",
+            NotificationType.payment_created: f"Payment for booking #{booking.id} has been created."
+        }
+        message = messages.get(notification_type, f"Booking #{booking.id} status updated to {notification_type.value}.")
     
     try:
         send_notification(
@@ -95,10 +100,14 @@ def enrich_booking(db: Session, booking) -> dict:
         "status": booking.status,
         "scheduled_time": booking.scheduled_time.isoformat() if booking.scheduled_time else None,
         "address": booking.address,
+        "booking_latitude": getattr(booking, "booking_latitude", None),
+        "booking_longitude": getattr(booking, "booking_longitude", None),
         "otp": booking.otp,
         "created_at": booking.created_at.isoformat() if booking.created_at else None,
         "user_name": user.name if user else "Unknown User",
         "service_provider_name": vendor_name,
+        "vendor_latitude": vendor.latitude if vendor else None,
+        "vendor_longitude": vendor.longitude if vendor else None,
         "category_name": cat.name if cat else None,
         "subcategory_name": subcat.name if subcat else None,
         "service_name": subcat.name if subcat else None,
@@ -106,7 +115,7 @@ def enrich_booking(db: Session, booking) -> dict:
     
     return booking_dict
 
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 def create_booking(
     booking: BookingCreate,
     db: Session = Depends(get_db),
@@ -119,23 +128,26 @@ def create_booking(
     booking_result = booking_crud.create_booking(db, booking)
     logger.info(f"Booking created successfully: ID {booking_result.id}")
 
+    # Notify User
     user_fcm_token = current_user.new_fcm_token or current_user.old_fcm_token
     send_booking_notification(
         db, booking_result, NotificationType.booking_created,
         recipient=current_user.email, recipient_id=current_user.id, fcm_token=user_fcm_token
     )
     
+    # Notify Vendor (New Booking Alert)
     vendor = booking_crud.get_vendor_by_serviceprovider_id(db, booking_result.serviceprovider_id)
     if vendor:
         vendor_fcm_token = vendor.new_fcm_token or vendor.old_fcm_token
         send_booking_notification(
             db, booking_result, NotificationType.booking_created, 
-            recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token
+            recipient=vendor.email, recipient_id=vendor.id, fcm_token=vendor_fcm_token,
+            custom_message=f"New booking request received! Booking #{booking_result.id}"
         )
 
     return enrich_booking(db, booking_result)
 
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 def get_all_bookings(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -274,21 +286,48 @@ def update_booking_status(
             notification_type = NotificationType.booking_completed
         elif update_data.status == BookingStatus.cancelled:
             notification_type = NotificationType.booking_cancelled
+        elif update_data.status == BookingStatus.rejected:
+            notification_type = NotificationType.booking_rejected
 
         if notification_type:
             user = booking_crud.get_user_by_id(db, booking.user_id)
             if user:
                 user_fcm_token = user.new_fcm_token or user.old_fcm_token
+                
+                # Custom messages for user based on vendor action
+                msg = None
+                if update_data.status == BookingStatus.accepted:
+                    msg = f"Good news! Your booking #{booking_id} has been accepted by the service provider."
+                elif update_data.status == BookingStatus.cancelled:
+                    msg = f"Update: Your booking #{booking_id} was cancelled."
+                elif update_data.status == BookingStatus.rejected:
+                    msg = f"Update: Your booking #{booking_id} was rejected by the service provider."
+                elif update_data.status == BookingStatus.completed:
+                    msg = f"Your service for booking #{booking_id} has been marked as completed. Thank you!"
+
                 send_booking_notification(
                     db, booking_result, notification_type, 
-                    recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token
+                    recipient=user.email, recipient_id=user.id, fcm_token=user_fcm_token,
+                    custom_message=msg
                 )
                 
-                # Send receipt email when booking is completed
+                # Send receipt email and create vendor earnings when booking is completed
                 if notification_type == NotificationType.booking_completed:
                     payment = payment_crud.get_payment_by_booking_id(db, booking_id)
                     if payment:
                         send_receipt_email(db, booking_result, payment, user.email)
+                        # Create vendor earnings entry (dynamic commission calculated inside)
+                        try:
+                            from app.crud import vendor_earnings_crud
+                            vendor_earnings_crud.create_vendor_earnings(
+                                db, 
+                                booking_id=booking_id, 
+                                vendor_id=vendor.id,
+                                total_paid=payment.amount
+                            )
+                            logger.info(f"Vendor earnings created for booking {booking_id}")
+                        except Exception as e:
+                            logger.error(f"Failed to create vendor earnings for booking {booking_id}: {str(e)}", exc_info=True)
                     else:
                         logger.warning(f"No payment found for completed booking {booking_id}")
             

@@ -7,6 +7,10 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Union
 import os
+from dotenv import load_dotenv
+
+# Load .env variables
+load_dotenv()
 
 from app.database import SessionLocal
 from app.models.user import User, UserStatus
@@ -31,16 +35,16 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: timedelta = None, token_type: str = "access", role: str = "user"):
     """
     Create JWT access or refresh tokens with role.
-    - Access tokens: 24 hours (persistent login like Instagram)
-    - Refresh tokens: 30 days
+    - Access tokens: 180 days (persistent login like Instagram)
+    - Refresh tokens: 365 days
     - role: 'user', 'vendor', or 'admin'
     """
     to_encode = data.copy()
 
     if token_type == "refresh":
-        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=30))
-    else:  # access token - 24 hours for persistent login
-        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=24))
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=365))
+    else:  # access token - 180 days for persistent login
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=180))
 
     to_encode.update({
         "exp": expire,
@@ -75,25 +79,29 @@ def get_current_identity(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(f"DEBUG: Decoded token payload: {payload}")
         email: str = payload.get("sub")
         role: str = payload.get("role")  # 'user' or 'vendor'
         
         if email is None:
+            print("DEBUG: Email is None in payload")
             raise credentials_exception
             
     except JWTError as e:
         # Add logging for debugging
-        print(f"JWT decode error: {str(e)}")
+        print(f"DEBUG: JWT decode error: {str(e)}")
         raise credentials_exception
 
     # Fetch based on role
     if role == 'vendor':
         vendor = db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
+        # print(f"DEBUG: Found vendor: {vendor.email if vendor else 'None'}")
         if vendor is None:
             print(f"Vendor not found for email: {email}")
             raise credentials_exception
             
         if vendor.status in ['rejected', 'inactive']:
+            # print(f"DEBUG: Vendor account blocked/inactive: {vendor.status}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been deactivated."
@@ -102,6 +110,7 @@ def get_current_identity(
         return vendor
     elif role == 'admin':
         user = db.query(User).filter(User.email == email).first()
+        # print(f"DEBUG: Found admin: {user.email if user else 'None'}")
         if user is None:
             print(f"Admin user not found for email: {email}")
             raise credentials_exception
@@ -118,11 +127,13 @@ def get_current_identity(
         return user
     else:  # default to user (role == 'user' or None)
         user = db.query(User).filter(User.email == email).first()
+        # print(f"DEBUG: Found user: {user.email if user else 'None'}")
         if user is None:
             print(f"User not found for email: {email}")
             raise credentials_exception
             
         if user.status == UserStatus.blocked:
+            # print(f"DEBUG: User account blocked")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been blocked."
