@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from ..models.notification_model import Notification, NotificationType, NotificationTarget
+from ..models.notification_model import Notification, NotificationType, NotificationTarget, UserNotificationStatus
 from ..models.user import User
 from typing import List, Optional
 import json
+from datetime import datetime
 
 class NotificationCRUD:
     def __init__(self, db: Session):
@@ -37,7 +38,93 @@ class NotificationCRUD:
 
     def get_all_notifications(self, skip: int = 0, limit: int = 100) -> List[Notification]:
         """Get all notifications with pagination"""
-        return self.db.query(Notification).offset(skip).limit(limit).all()
+        return self.db.query(Notification).order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
+
+    def get_user_notifications(self, user_id: int, skip: int = 0, limit: int = 50) -> List[dict]:
+        """Get notifications for a specific user including read status"""
+        # Get notifications where user is targeted or targeted to all/their role
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return []
+
+        # Find notifications targeted to this user
+        notifications = self.db.query(Notification).filter(
+            or_(
+                Notification.target_type == NotificationTarget.ALL_USERS,
+                and_(Notification.target_type == NotificationTarget.SERVICE_PROVIDERS, user.role == "service_provider"),
+                and_(Notification.target_type == NotificationTarget.SPECIFIC_USERS, Notification.target_user_ids.contains(str(user_id)))
+            ),
+            Notification.is_sent == True
+        ).order_by(Notification.sent_at.desc()).offset(skip).limit(limit).all()
+
+        result = []
+        for n in notifications:
+            status = self.db.query(UserNotificationStatus).filter(
+                UserNotificationStatus.notification_id == n.id,
+                UserNotificationStatus.user_id == user_id
+            ).first()
+            
+            result.append({
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "type": n.notification_type,
+                "created_at": n.sent_at or n.created_at,
+                "is_read": status.is_read if status else False
+            })
+        
+        return result
+
+    def mark_as_read(self, user_id: int, notification_id: int) -> bool:
+        """Mark a notification as read for a specific user"""
+        status = self.db.query(UserNotificationStatus).filter(
+            UserNotificationStatus.notification_id == notification_id,
+            UserNotificationStatus.user_id == user_id
+        ).first()
+
+        if status:
+            if not status.is_read:
+                status.is_read = True
+                status.read_at = datetime.now()
+                self.db.commit()
+            return True
+        else:
+            # Create new status if it doesn't exist
+            new_status = UserNotificationStatus(
+                user_id=user_id,
+                notification_id=notification_id,
+                is_read=True,
+                read_at=datetime.now()
+            )
+            self.db.add(new_status)
+            self.db.commit()
+            return True
+
+    def get_unread_count(self, user_id: int) -> int:
+        """Get count of unread notifications for a user"""
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return 0
+
+        # Subquery for read notification IDs
+        read_notification_ids = self.db.query(UserNotificationStatus.notification_id).filter(
+            UserNotificationStatus.user_id == user_id,
+            UserNotificationStatus.is_read == True
+        ).all()
+        read_ids = [r[0] for r in read_notification_ids]
+
+        # Count notifications targeted to this user that are NOT in the read_ids list
+        unread_count = self.db.query(Notification).filter(
+            or_(
+                Notification.target_type == NotificationTarget.ALL_USERS,
+                and_(Notification.target_type == NotificationTarget.SERVICE_PROVIDERS, user.role == "service_provider"),
+                and_(Notification.target_type == NotificationTarget.SPECIFIC_USERS, Notification.target_user_ids.contains(str(user_id)))
+            ),
+            Notification.is_sent == True,
+            ~Notification.id.in_(read_ids) if read_ids else True
+        ).count()
+
+        return unread_count
 
     def get_notifications_by_sender(self, sender_id: int, skip: int = 0, limit: int = 50) -> List[Notification]:
         """Get notifications sent by a specific user"""
@@ -52,7 +139,7 @@ class NotificationCRUD:
         notification = self.get_notification_by_id(notification_id)
         if notification:
             notification.is_sent = True
-            notification.sent_at = self.db.func.now()
+            notification.sent_at = datetime.now()
             self.db.commit()
             return True
         return False

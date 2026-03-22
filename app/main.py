@@ -14,7 +14,8 @@ from app.models import (
     booking_model,
     payment_model,
     user_address,
-    vendor_subcategory_charge
+    vendor_subcategory_charge,
+    help_center_model
 )
 
 from app.api.routes import (
@@ -39,6 +40,7 @@ from app.api.routes import (
     referral_routes,
     referral_stats_routes,
     nearby_vendor_routes,
+    help_center_routes,
 )
 
 # -------------------------
@@ -132,6 +134,8 @@ app.include_router(referral_stats_routes.router, prefix="/api")
 # Nearby Vendor + Live Location + Booking Flow
 # =============================================
 app.include_router(nearby_vendor_routes.router, prefix="/api", tags=["Nearby & Location"])
+
+app.include_router(help_center_routes.router, prefix="/api/help-center", tags=["help-center"])
 
 # -------------------------
 # Custom OpenAPI with JWT

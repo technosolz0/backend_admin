@@ -33,6 +33,21 @@ class Notification(Base):
 
     # Relationship
     sender = relationship("User", back_populates="sent_notifications")
+    user_statuses = relationship("UserNotificationStatus", back_populates="notification", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Notification(id={self.id}, title='{self.title}', type={self.notification_type})>"
+
+class UserNotificationStatus(Base):
+    __tablename__ = "user_notification_statuses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    notification_id = Column(Integer, ForeignKey("notifications.id"), nullable=False)
+    is_read = Column(Boolean, default=False)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    notification = relationship("Notification", back_populates="user_statuses")
+    user = relationship("User", backref="notification_statuses")
