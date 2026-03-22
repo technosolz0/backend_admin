@@ -28,6 +28,7 @@ from .notification_model import Notification, NotificationType, NotificationTarg
 from .feedback_model import Feedback
 from .report_model import Report
 from .review_model import Review
+from .help_center_model import HelpCenter
 
 from sqlalchemy.orm import configure_mappers
 configure_mappers()
