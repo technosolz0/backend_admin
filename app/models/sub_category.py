@@ -1,6 +1,6 @@
 # app/models/sub_category.py
 # NEW_NAME: sub_category_model.py
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, Float
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.schemas.sub_category_schema import SubCategoryStatus
@@ -12,6 +12,7 @@ class SubCategory(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     image = Column(String, nullable=True)
+    service_charge = Column(Float, default=0.0)
     status = Column(Enum(SubCategoryStatus), default=SubCategoryStatus.active)
 
     category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)

@@ -32,97 +32,36 @@ from pathlib import Path
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+import string
+import secrets
+
+def generate_referral_code(db: Session, full_name: str, length=4) -> str:
+    """Generate a unique referral code: First 1-2 initials + 4 digits."""
+    # Get initials
+    parts = full_name.split()
+    initials = ""
+    if len(parts) >= 2:
+        initials = (parts[0][0] + parts[-1][0]).upper()
+    elif len(parts) == 1:
+        initials = parts[0][:2].upper()
+    else:
+        initials = "SX" # Fallback
+        
+    digits = string.digits
+    while True:
+        random_part = ''.join(secrets.choice(digits) for _ in range(length))
+        code = f"{initials}{random_part}"
+        # Check if code already exists
+        exists = db.query(ServiceProvider).filter(ServiceProvider.referral_code == code).first()
+        if not exists:
+            return code
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 OTP_EXPIRY_MINUTES = 5
 MAX_OTP_ATTEMPTS = 3
 MAX_OTP_RESENDS = 3
 OTP_RESEND_COOLDOWN_MINUTES = 1
 
-# def verify_password(plain_password: str, hashed_password: str) -> bool:
-#     return pwd_context.verify(plain_password, hashed_password)
-
-# def get_vendor_by_email(db: Session, email: str) -> ServiceProvider:
-#     return db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
-
-# def get_vendor_by_id(db: Session, vendor_id: int) -> ServiceProvider:
-#     return db.query(ServiceProvider).filter(ServiceProvider.id == vendor_id).first()
-
-# def get_subcategory_by_id(db: Session, subcategory_id: int) -> SubCategory:
-#     return db.query(SubCategory).filter(SubCategory.id == subcategory_id).first()
-
-# def get_category_by_id(db: Session, category_id: int) -> Category:
-#     return db.query(Category).filter(Category.id == category_id).first()
-
-# def attach_subcategory_charges(db: Session, vendor_id: int) -> List[SubCategoryCharge]:
-#     charges = db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).all()
-#     return [
-#         SubCategoryCharge(
-#             subcategory_id=charge.subcategory_id,
-#             subcategory_name=get_subcategory_by_id(db, charge.subcategory_id).name if get_subcategory_by_id(db, charge.subcategory_id) else None,
-#             service_charge=charge.service_charge
-#         )
-#         for charge in charges
-#     ]
-
-# # Add this import at top
-# from app.models.vendor_bank_account_model import VendorBankAccount
-
-# # Update build_vendor_response function
-# def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorResponse:
-#     """Build vendor response with all details"""
-    
-#     # Get Category Name
-#     category_name = None
-#     if vendor.category_id:
-#         category = db.query(Category).filter(Category.id == vendor.category_id).first()
-#         category_name = category.name if category else None
-
-#     # Get SubCategory Names + Charges
-#     subcategory_charges = attach_subcategory_charges(db, vendor.id)
-    
-#     # ✅ Get bank accounts
-#     from app.schemas.service_provider_schema import BankAccountOut
-#     bank_accounts = db.query(VendorBankAccount).filter(
-#         VendorBankAccount.vendor_id == vendor.id
-#     ).order_by(
-#         VendorBankAccount.is_primary.desc(),
-#         VendorBankAccount.created_at.desc()
-#     ).all()
-    
-#     bank_accounts_out = [BankAccountOut.from_orm(ba) for ba in bank_accounts]
-
-#     return VendorResponse(
-#         id=vendor.id,
-#         full_name=vendor.full_name,
-#         email=vendor.email,
-#         phone=vendor.phone,
-#         address=vendor.address,
-#         state=vendor.state,
-#         city=vendor.city,
-#         pincode=vendor.pincode,
-#         account_holder_name=vendor.account_holder_name,
-#         account_number=vendor.account_number,
-#         ifsc_code=vendor.ifsc_code,
-#         upi_id=vendor.upi_id,
-#         identity_doc_type=vendor.identity_doc_type,
-#         identity_doc_number=vendor.identity_doc_number,
-#         identity_doc_url=vendor.identity_doc_url,
-#         bank_doc_type=vendor.bank_doc_type,
-#         bank_doc_number=vendor.bank_doc_number,
-#         bank_doc_url=vendor.bank_doc_url,
-#         address_doc_type=vendor.address_doc_type,
-#         address_doc_number=vendor.address_doc_number,
-#         address_doc_url=vendor.address_doc_url,
-#         category_id=vendor.category_id,
-#         category_name=category_name,
-#         profile_pic=vendor.profile_pic,
-#         step=vendor.step,
-#         status=vendor.status,
-#         admin_status=vendor.admin_status,
-#         work_status=vendor.work_status,
-#         subcategory_charges=subcategory_charges,
-#         bank_accounts=bank_accounts_out  # ✅ Add this
-#     )
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -230,7 +169,8 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         admin_status=vendor.admin_status,
         work_status=vendor.work_status,
         subcategory_charges=subcategory_charges,
-        bank_accounts=bank_accounts_out
+        bank_accounts=bank_accounts_out,
+        referral_code=vendor.referral_code
     )
 
 
@@ -317,7 +257,8 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
             last_device_update=now,
             status='pending',
             admin_status='inactive',
-            work_status='work_on'
+            work_status='work_on',
+            referral_code=generate_referral_code(db, vendor.full_name)
         )
         db.add(db_vendor)
         db.commit()

@@ -34,6 +34,7 @@ def create_sub_category(
     name: str = Form(...),
     status: SubCategoryStatus = Form(default=SubCategoryStatus.active),
     category_id: int = Form(...),
+    service_charge: float = Form(default=0.0),
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -43,6 +44,7 @@ def create_sub_category(
         name=name,
         status=status,
         category_id=category_id,
+        service_charge=service_charge,
         image=image_path
     )
     db.add(new_sub_category)
@@ -78,6 +80,7 @@ def update_sub_category(
     name: str = Form(...),
     status: SubCategoryStatus = Form(...),
     category_id: int = Form(...),
+    service_charge: float = Form(...),
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -91,6 +94,7 @@ def update_sub_category(
     sub_category.name = name
     sub_category.status = status
     sub_category.category_id = category_id
+    sub_category.service_charge = service_charge
 
     db.commit()
     db.refresh(sub_category)
@@ -103,6 +107,7 @@ def partial_update_sub_category(
     name: str = Form(None),
     status: SubCategoryStatus = Form(None),
     category_id: int = Form(None),
+    service_charge: float = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
@@ -116,6 +121,8 @@ def partial_update_sub_category(
         sub_category.status = status
     if category_id:
         sub_category.category_id = category_id
+    if service_charge is not None:
+        sub_category.service_charge = service_charge
     if image:
         sub_category.image = save_image(image, sub_category.image)
 

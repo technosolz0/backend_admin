@@ -56,6 +56,7 @@ class VendorCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     device_name: Optional[str] = None
+    referral_code: Optional[str] = None
 
 class AddressDetailsUpdate(BaseModel):
     address: str
@@ -120,6 +121,7 @@ class VendorResponse(BaseModel):
     work_status: str = Field(..., pattern="^(work_on|work_off)$")
     subcategory_charges: List[SubCategoryCharge]
     bank_accounts: List[BankAccountOut] = []
+    referral_code: Optional[str] = None
 
     class Config:
         from_attributes = True

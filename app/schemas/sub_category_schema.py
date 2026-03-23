@@ -10,6 +10,7 @@ class SubCategoryBase(BaseModel):
     name: str
     status: SubCategoryStatus
     image: Optional[str] = None
+    service_charge: Optional[float] = 0.0
     category_id: int
 
 class SubCategoryCreate(SubCategoryBase):
@@ -19,6 +20,7 @@ class SubCategoryUpdate(BaseModel):
     name: Optional[str]
     status: Optional[SubCategoryStatus]
     image: Optional[str]
+    service_charge: Optional[float]
     category_id: Optional[int]
 
 class SubCategoryOut(BaseModel):
@@ -26,6 +28,7 @@ class SubCategoryOut(BaseModel):
     name: str
     status: SubCategoryStatus
     image: Optional[str]
+    service_charge: float
     category_id: int
 
     class Config:
