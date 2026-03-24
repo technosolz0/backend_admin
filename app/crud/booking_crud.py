@@ -84,21 +84,27 @@ def get_vendor_by_serviceprovider_id(db: Session, serviceprovider_id: int) -> Op
 
 def get_bookings_by_user_id(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get bookings by user ID."""
-    return db.query(Booking).filter(Booking.user_id == user_id).offset(skip).limit(limit).all()
+    return db.query(Booking).filter(
+        Booking.user_id == user_id
+    ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_vendor_id(db: Session, vendor_id: int, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get bookings by vendor ID."""
-    return db.query(Booking).filter(Booking.serviceprovider_id == vendor_id).offset(skip).limit(limit).all()
+    return db.query(Booking).filter(
+        Booking.serviceprovider_id == vendor_id
+    ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_status(db: Session, status: BookingStatus, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get bookings by status."""
-    return db.query(Booking).filter(Booking.status == status).offset(skip).limit(limit).all()
+    return db.query(Booking).filter(
+        Booking.status == status
+    ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_user_and_status(db: Session, user_id: int, status: BookingStatus, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get bookings by user ID and status."""
     return db.query(Booking).filter(
         and_(Booking.user_id == user_id, Booking.status == status)
-    ).offset(skip).limit(limit).all()
+    ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_vendor_and_status(db: Session, vendor_id: int, status: BookingStatus, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get bookings by vendor ID and status."""
@@ -114,7 +120,7 @@ def get_bookings_by_date_range(db: Session, start_date: datetime, end_date: date
 
 def get_all_bookings(db: Session, skip: int = 0, limit: int = 100) -> List[Booking]:
     """Get all bookings with pagination."""
-    return db.query(Booking).offset(skip).limit(limit).all()
+    return db.query(Booking).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def delete_booking(db: Session, booking_id: int) -> bool:
     """Delete a booking if pending or cancelled."""

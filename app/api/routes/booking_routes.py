@@ -98,12 +98,12 @@ def enrich_booking(db: Session, booking) -> dict:
         "category_id": booking.category_id,
         "subcategory_id": booking.subcategory_id,
         "status": booking.status,
-        "scheduled_time": booking.scheduled_time.isoformat() if booking.scheduled_time else None,
+        "scheduled_time": booking.scheduled_time.isoformat() + "Z" if booking.scheduled_time else None,
         "address": booking.address,
         "booking_latitude": getattr(booking, "booking_latitude", None),
         "booking_longitude": getattr(booking, "booking_longitude", None),
         "otp": booking.otp,
-        "created_at": booking.created_at.isoformat() if booking.created_at else None,
+        "created_at": booking.created_at.isoformat() + "Z" if booking.created_at else None,
         "user_name": user.name if user else "Unknown User",
         "service_provider_name": vendor_name,
         "vendor_latitude": vendor.latitude if vendor else None,
@@ -126,7 +126,7 @@ def create_booking(
         raise HTTPException(status_code=403, detail="You can't create booking for another user.")
 
     booking_result = booking_crud.create_booking(db, booking)
-    logger.info(f"Booking created successfully: ID {booking_result.id}")
+    logger.info(f"Booking created successfully: ID {booking_result.id} for Vendor ID {booking_result.serviceprovider_id} by User ID {booking_result.user_id}")
 
     # Notify User
     user_fcm_token = current_user.new_fcm_token or current_user.old_fcm_token

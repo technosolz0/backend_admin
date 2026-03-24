@@ -372,9 +372,9 @@ def get_vendor_dashboard(
                 "user_name": user_name or "Unknown User",
                 "service_name": getattr(booking, "service_name", "N/A"),
                 "status": booking.status.value,
-                "scheduled_time": booking.scheduled_time.isoformat() if booking.scheduled_time else None,
+                "scheduled_time": booking.scheduled_time.isoformat() + "Z" if booking.scheduled_time else None,
                 "address": booking.address,
-                "created_at": booking.created_at.isoformat(),
+                "created_at": booking.created_at.isoformat() + "Z",
                 "payment_amount": float(payment_amount) if payment_amount else 0.0,
                 "payment_status": payment_status.value if payment_status else None,
             })
