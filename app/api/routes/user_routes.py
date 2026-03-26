@@ -232,6 +232,23 @@ def login_user(
     }
 
 
+# ================= LOGOUT ENDPOINT =================
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Logout user and clear FCM token to stop notifications.
+    """
+    current_user.new_fcm_token = None
+    current_user.old_fcm_token = None
+    db.commit()
+    logger.info(f"User logged out: {current_user.email}")
+    return {"success": True, "message": "Logged out successfully"}
+
+
 # ================= PASSWORD RESET ENDPOINTS =================
 
 @router.post("/password-reset/request", response_model=dict, status_code=status.HTTP_200_OK)
@@ -583,6 +600,10 @@ def refresh_access_token(
     - 200: New access token generated successfully
     - 401: Invalid or expired refresh token
     """
+    from jose import jwt, JWTError
+    from app.core.security import SECRET_KEY, ALGORITHM
+    from app.models.service_provider_model import ServiceProvider
+
     refresh_token = refresh_data.get("refresh_token")
 
     if not refresh_token:

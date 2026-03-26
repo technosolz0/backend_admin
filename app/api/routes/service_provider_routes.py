@@ -177,6 +177,22 @@ def vendor_login_endpoint(data: VendorLoginRequest, db: Session = Depends(get_db
     }
 
 
+# =================== LOGOUT ENDPOINT ===================
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout_vendor(
+    db: Session = Depends(get_db),
+    current_vendor: ServiceProvider = Depends(get_current_vendor)
+):
+    """
+    Logout vendor and clear FCM token to stop notifications.
+    """
+    current_vendor.new_fcm_token = None
+    db.commit()
+    logger.info(f"Vendor logged out: {current_vendor.email}")
+    return {"success": True, "message": "Logged out successfully"}
+
+
 # =================== PASSWORD MANAGEMENT ===================
 
 @router.post("/change-password", response_model=dict, status_code=status.HTTP_200_OK)

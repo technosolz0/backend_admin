@@ -42,9 +42,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None, token_type:
     to_encode = data.copy()
 
     if token_type == "refresh":
-        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=365))
-    else:  # access token - 180 days for persistent login
-        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=180))
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=3650))
+    else:  # access token - "Never" expire (set to 10 years)
+        expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=3650))
+
 
     to_encode.update({
         "exp": expire,
