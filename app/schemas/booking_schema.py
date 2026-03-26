@@ -33,18 +33,30 @@ class BookingOut(BaseModel):
     serviceprovider_id: int
     category_id: int
     subcategory_id: int
+    
+    # Enriched fields for response
+    user_name: Optional[str] = None
+    service_provider_name: Optional[str] = None
     category_name: Optional[str] = None
     subcategory_name: Optional[str] = None
-
-    scheduled_time: datetime
-    address: str
+    service_name: Optional[str] = None
+    
+    # Location/Status
     status: BookingStatus
-    created_at: datetime
+    scheduled_time: Optional[datetime] = None
+    address: str
+    booking_latitude: Optional[float] = None
+    booking_longitude: Optional[float] = None
+    vendor_latitude: Optional[float] = None
+    vendor_longitude: Optional[float] = None
+    
+    # Timing/Secret
     otp: Optional[str] = None
+    created_at: datetime
     otp_created_at: Optional[datetime] = None
-    model_config = {
-        "from_attributes": True
-    }
+
+    class Config:
+        from_attributes = True
 class BookingSearchResponse(BaseModel):
     bookings: List[BookingOut]
     total: int

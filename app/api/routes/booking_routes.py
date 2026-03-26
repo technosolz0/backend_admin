@@ -150,15 +150,40 @@ def create_booking(
 @router.get("", response_model=List[dict])
 def get_all_bookings(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    identity=Depends(get_current_identity),
     status: Optional[BookingStatus] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100)
 ):
-    if status:
-        bookings = booking_crud.get_bookings_by_user_and_status(db, user.id, status, skip, limit)
-    else:
-        bookings = booking_crud.get_bookings_by_user_id(db, user.id, skip, limit)
+    """
+    Get bookings based on user role:
+    - Admin: All bookings in system
+    - User: Their own bookings
+    - Vendor: Bookings assigned to them
+    """
+    bookings = []
+    
+    # 1. Admin - Get all bookings in the system
+    if isinstance(identity, User) and identity.is_superuser:
+        if status:
+            bookings = booking_crud.get_bookings_by_status(db, status, skip, limit)
+        else:
+            bookings = booking_crud.get_all_bookings(db, skip, limit)
+            
+    # 2. Regular User - Get their own bookings
+    elif isinstance(identity, User):
+        if status:
+            bookings = booking_crud.get_bookings_by_user_and_status(db, identity.id, status, skip, limit)
+        else:
+            bookings = booking_crud.get_bookings_by_user_id(db, identity.id, skip, limit)
+            
+    # 3. Vendor - Get bookings assigned to them (for Partner App)
+    elif isinstance(identity, Vendor):
+        if status:
+            bookings = booking_crud.get_bookings_by_vendor_and_status(db, identity.id, status, skip, limit)
+        else:
+            bookings = booking_crud.get_bookings_by_vendor_id(db, identity.id, skip, limit)
+            
     return [enrich_booking(db, b) for b in bookings]
 
 @router.get("/admin/all", response_model=dict)
