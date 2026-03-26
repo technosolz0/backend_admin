@@ -10,7 +10,7 @@ from app.models.sub_category import SubCategory
 from app.schemas.service_provider_schema import (
     PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest,
-    VendorChangePasswordRequest
+    VendorChangePasswordRequest, VendorPasswordResetRequest, VendorPasswordResetConfirm
 )
 from app.core.security import create_access_token, get_current_vendor, get_db
 from app.crud.service_provider_crud import (
@@ -218,6 +218,46 @@ def change_password_endpoint(
         "success": True,
         "message": result["message"]
     }
+
+
+# =================== PASSWORD RESET ===================
+
+@router.post("/password-reset/request", status_code=status.HTTP_200_OK)
+def request_password_reset_vendor_endpoint(
+    data: VendorPasswordResetRequest,
+    db: Session = Depends(get_db)
+):
+    """Request a password reset OTP for a vendor."""
+    from app.crud.service_provider_crud import request_vendor_password_reset
+    
+    result = request_vendor_password_reset(db, data.email)
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["message"]
+        )
+    
+    return {"message": result["message"]}
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+def confirm_password_reset_vendor_endpoint(
+    data: VendorPasswordResetConfirm,
+    db: Session = Depends(get_db)
+):
+    """Confirm password reset with OTP for a vendor."""
+    from app.crud.service_provider_crud import confirm_vendor_password_reset
+    
+    result = confirm_vendor_password_reset(db, data.email, data.otp, data.new_password)
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["message"]
+        )
+    
+    return {"message": result["message"]}
 
 
 # =================== VENDOR PROFILE ENDPOINTS ===================

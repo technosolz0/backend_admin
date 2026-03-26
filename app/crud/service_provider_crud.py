@@ -919,3 +919,132 @@ def change_vendor_password(db: Session, vendor_id: int, old_password: str, new_p
         db.rollback()
         logger.error(f"Unexpected error changing password for vendor {vendor_id}: {str(e)}")
         return {"success": False, "message": "Internal server error."}
+# =================== PASSWORD RESET ===================
+
+def request_vendor_password_reset(db: Session, email: str) -> Dict[str, Any]:
+    """Request password reset OTP for vendor."""
+    try:
+        vendor = get_vendor_by_email(db, email)
+        
+        if not vendor:
+            logger.warning(f"Vendor password reset request for non-existent email: {email}")
+            return {
+                "success": False,
+                "message": "We couldn't find an account with this email. Please check and try again.",
+                "data": None
+            }
+        
+        if not vendor.otp_verified:
+            logger.warning(f"Vendor password reset request for unverified account: {email}")
+            return {
+                "success": False,
+                "message": "Your email is not verified yet. Please check your inbox for the OTP we sent you.",
+                "data": None
+            }
+
+        otp = generate_otp()
+        vendor.otp = otp
+        vendor.otp_created_at = datetime.utcnow()
+        db.commit()
+        db.refresh(vendor)
+        
+        # Send reset OTP email
+        try:
+            send_email(receiver_email=vendor.email, otp=otp, template="password_reset")
+            logger.info(f"Vendor password reset OTP sent to: {vendor.email}")
+        except Exception as e:
+            logger.error(f"Failed to send vendor password reset OTP to {vendor.email}: {str(e)}")
+        
+        return {
+            "success": True,
+            "message": "Password reset OTP sent to your email.",
+            "data": None
+        }
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in request_vendor_password_reset: {str(e)}")
+        return {
+            "success": False,
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
+            "data": None
+        }
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Unexpected error in request_vendor_password_reset: {str(e)}")
+        return {
+            "success": False,
+            "message": "Something went wrong while processing your request. Please try again.",
+            "data": None
+        }
+
+
+def confirm_vendor_password_reset(db: Session, email: str, otp: str, new_password: str) -> Dict[str, Any]:
+    """Confirm vendor password reset with OTP."""
+    try:
+        vendor = get_vendor_by_email(db, email)
+        
+        if not vendor:
+            logger.warning(f"Vendor password reset confirmation for non-existent email: {email}")
+            return {
+                "success": False,
+                "message": "We couldn't find an account with this email. Please check and try again.",
+                "data": None
+            }
+        
+        if not vendor.otp:
+            logger.warning(f"Vendor password reset confirmation but no OTP exists for: {email}")
+            return {
+                "success": False,
+                "message": "No active password reset request found. Please request a new one.",
+                "data": None
+            }
+        
+        if vendor.otp != otp:
+            logger.warning(f"Invalid OTP for vendor password reset: {email}")
+            return {
+                "success": False,
+                "message": "The OTP you entered is incorrect. Double-check and try again.",
+                "data": None
+            }
+
+        # Check OTP expiry (5 minutes)
+        expiry_time = vendor.otp_created_at + timedelta(minutes=5)
+        if datetime.utcnow() > expiry_time:
+            logger.warning(f"Expired OTP for vendor password reset: {email}")
+            return {
+                "success": False,
+                "message": "This OTP has expired. Please request a new password reset.",
+                "data": None
+            }
+
+        # Reset password
+        vendor.password = get_password_hash(new_password)
+        vendor.otp = None
+        vendor.otp_created_at = None
+        db.commit()
+        db.refresh(vendor)
+        
+        logger.info(f"Vendor password reset successfully for: {email}")
+        return {
+            "success": True,
+            "message": "Password reset successfully! You can now login with your new password.",
+            "data": None
+        }
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception(f"Database error in confirm_vendor_password_reset: {str(e)}")
+        return {
+            "success": False,
+            "message": "Our servers are experiencing a hiccup. Please try again later.",
+            "data": None
+        }
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Unexpected error in confirm_vendor_password_reset: {str(e)}")
+        return {
+            "success": False,
+            "message": "Something went wrong while resetting your password. Please try again.",
+            "data": None
+        }

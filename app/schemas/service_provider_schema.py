@@ -147,3 +147,11 @@ class VendorLogoutRequest(BaseModel):
 class VendorChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
+
+class VendorPasswordResetRequest(BaseModel):
+    email: str
+
+class VendorPasswordResetConfirm(BaseModel):
+    email: str
+    otp: str
+    new_password: str
