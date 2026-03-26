@@ -251,7 +251,8 @@ from app.crud import withdrawal_crud
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/vendor-dashboard", tags=["Vendor Dashboard"])
+router = APIRouter(prefix="/vendor/dashboard", tags=["Vendor Dashboard"])
+
 
 COMMISSION_RATE = 0.10  # 10% commission
 
@@ -265,151 +266,194 @@ def get_vendor_dashboard(
     try:
         vendor_id = vendor.id
         today = datetime.now().date()
+        current_year = datetime.now().year
 
         # ==================== BOOKING STATS ====================
-        total_bookings = db.query(func.count(Booking.id)).filter(
-            Booking.serviceprovider_id == vendor_id
-        ).scalar() or 0
+        try:
+            total_bookings = db.query(func.count(Booking.id)).filter(
+                Booking.serviceprovider_id == vendor_id
+            ).scalar() or 0
 
-        pending_bookings = db.query(func.count(Booking.id)).filter(
-            and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.pending)
-        ).scalar() or 0
+            pending_bookings = db.query(func.count(Booking.id)).filter(
+                and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.pending)
+            ).scalar() or 0
 
-        accepted_bookings = db.query(func.count(Booking.id)).filter(
-            and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.accepted)
-        ).scalar() or 0
+            accepted_bookings = db.query(func.count(Booking.id)).filter(
+                and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.accepted)
+            ).scalar() or 0
 
-        completed_bookings = db.query(func.count(Booking.id)).filter(
-            and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.completed)
-        ).scalar() or 0
+            completed_bookings = db.query(func.count(Booking.id)).filter(
+                and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.completed)
+            ).scalar() or 0
 
-        cancelled_bookings = db.query(func.count(Booking.id)).filter(
-            and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.cancelled)
-        ).scalar() or 0
+            cancelled_bookings = db.query(func.count(Booking.id)).filter(
+                and_(Booking.serviceprovider_id == vendor_id, Booking.status == BookingStatus.cancelled)
+            ).scalar() or 0
 
-        # ==================== TODAY'S BOOKINGS ====================
-        today_start = datetime.combine(today, datetime.min.time())
-        today_end = datetime.combine(today, datetime.max.time())
+            # Today's Bookings
+            today_start = datetime.combine(today, datetime.min.time())
+            today_end = datetime.combine(today, datetime.max.time())
+            today_bookings = db.query(func.count(Booking.id)).filter(
+                and_(
+                    Booking.serviceprovider_id == vendor_id,
+                    Booking.scheduled_time >= today_start,
+                    Booking.scheduled_time <= today_end,
+                )
+            ).scalar() or 0
+        except Exception as e:
+            logger.error(f"Error fetching booking stats: {e}")
+            total_bookings = pending_bookings = accepted_bookings = completed_bookings = cancelled_bookings = today_bookings = 0
 
-        today_bookings = db.query(func.count(Booking.id)).filter(
-            and_(
-                Booking.serviceprovider_id == vendor_id,
-                Booking.scheduled_time >= today_start,
-                Booking.scheduled_time <= today_end,
-            )
-        ).scalar() or 0
+        # ==================== PAYMENT ANALYTICS ====================
+        try:
+            payment_stats = db.query(
+                func.count(Payment.id).label("total_payments"),
+                func.sum(Payment.amount).label("total_revenue"),
+                func.avg(Payment.amount).label("avg_payment"),
+            ).join(Booking, Payment.booking_id == Booking.id).filter(
+                and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.SUCCESS)
+            ).first()
 
-        # ==================== PAYMENT ANALYTICS WITH COMMISSION ====================
-        payment_stats = db.query(
-            func.count(Payment.id).label("total_payments"),
-            func.sum(Payment.amount).label("total_revenue"),
-            func.avg(Payment.amount).label("avg_payment"),
-        ).join(Booking, Payment.booking_id == Booking.id).filter(
-            and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.SUCCESS)
-        ).first()
-
-        total_payments_count = payment_stats.total_payments or 0
-        gross_revenue = float(payment_stats.total_revenue or 0)
-        avg_payment = float(payment_stats.avg_payment or 0)
+            total_payments_count = (payment_stats.total_payments if payment_stats else 0) or 0
+            gross_revenue = float((payment_stats.total_revenue if payment_stats else 0) or 0)
+            avg_payment = float((payment_stats.avg_payment if payment_stats else 0) or 0)
+        except Exception as e:
+            logger.error(f"Error fetching payment stats: {e}")
+            total_payments_count = 0
+            gross_revenue = 0.0
+            avg_payment = 0.0
 
         # Calculate commission
         commission_amount = gross_revenue * COMMISSION_RATE
         net_revenue = gross_revenue - commission_amount
 
         # Get withdrawal amounts
-        completed_withdrawals = withdrawal_crud.get_completed_withdrawal_amount(db, vendor_id)
-        pending_withdrawals = withdrawal_crud.get_pending_withdrawal_amount(db, vendor_id)
+        try:
+            completed_withdrawals = withdrawal_crud.get_completed_withdrawal_amount(db, vendor_id)
+            pending_withdrawals = withdrawal_crud.get_pending_withdrawal_amount(db, vendor_id)
+        except Exception as e:
+            logger.error(f"Error fetching withdrawal amounts: {e}")
+            completed_withdrawals = 0.0
+            pending_withdrawals = 0.0
 
         # Calculate available balance
         available_balance = net_revenue - completed_withdrawals - pending_withdrawals
 
         # ==================== SUCCESS RATE ====================
-        all_payments = db.query(func.count(Payment.id)).join(
-            Booking, Payment.booking_id == Booking.id
-        ).filter(Booking.serviceprovider_id == vendor_id).scalar() or 0
+        try:
+            all_payments_count = db.query(func.count(Payment.id)).join(
+                Booking, Payment.booking_id == Booking.id
+            ).filter(Booking.serviceprovider_id == vendor_id).scalar() or 0
 
-        success_rate = (total_payments_count / all_payments * 100) if all_payments > 0 else 0
+            success_rate = (total_payments_count / all_payments_count * 100) if all_payments_count > 0 else 0
 
-        pending_payments = db.query(func.count(Payment.id)).join(
-            Booking, Payment.booking_id == Booking.id
-        ).filter(and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.PENDING)).scalar() or 0
+            pending_payments = db.query(func.count(Payment.id)).join(
+                Booking, Payment.booking_id == Booking.id
+            ).filter(and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.PENDING)).scalar() or 0
 
-        failed_payments = db.query(func.count(Payment.id)).join(
-            Booking, Payment.booking_id == Booking.id
-        ).filter(and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.FAILED)).scalar() or 0
+            failed_payments = db.query(func.count(Payment.id)).join(
+                Booking, Payment.booking_id == Booking.id
+            ).filter(and_(Booking.serviceprovider_id == vendor_id, Payment.status == PaymentStatus.FAILED)).scalar() or 0
+        except Exception as e:
+            logger.error(f"Error calculating success rate: {e}")
+            success_rate = 0.0
+            pending_payments = 0
+            failed_payments = 0
 
         # ==================== TODAY'S EARNINGS ====================
-        today_revenue = db.query(func.sum(Payment.amount)).join(
-            Booking, Payment.booking_id == Booking.id
-        ).filter(
-            and_(
-                Booking.serviceprovider_id == vendor_id,
-                Payment.status == PaymentStatus.SUCCESS,
-                func.date(Payment.created_at) == today
-            )
-        ).scalar() or 0
+        try:
+            today_revenue = db.query(func.sum(Payment.amount)).join(
+                Booking, Payment.booking_id == Booking.id
+            ).filter(
+                and_(
+                    Booking.serviceprovider_id == vendor_id,
+                    Payment.status == PaymentStatus.SUCCESS,
+                    func.date(Payment.created_at) == today
+                )
+            ).scalar() or 0
 
-        today_commission = float(today_revenue) * COMMISSION_RATE
-        today_net_earnings = float(today_revenue) - today_commission
+            today_commission = float(today_revenue) * COMMISSION_RATE
+            today_net_earnings = float(today_revenue) - today_commission
+        except Exception as e:
+            logger.error(f"Error fetching today's earnings: {e}")
+            today_revenue = 0.0
+            today_commission = 0.0
+            today_net_earnings = 0.0
 
         # ==================== RECENT BOOKINGS ====================
-        recent_bookings_query = db.query(
-            Booking,
-            User.name.label("user_name"),
-            Payment.amount.label("payment_amount"),
-            Payment.status.label("payment_status"),
-        ).outerjoin(User, Booking.user_id == User.id).outerjoin(
-            Payment, Booking.id == Payment.booking_id
-        ).filter(
-            Booking.serviceprovider_id == vendor_id
-        ).order_by(Booking.created_at.desc()).limit(10).all()
-
         recent_bookings = []
-        for booking, user_name, payment_amount, payment_status in recent_bookings_query:
-            recent_bookings.append({
-                "id": booking.id,
-                "user_id": booking.user_id,
-                "user_name": user_name or "Unknown User",
-                "service_name": getattr(booking, "service_name", "N/A"),
-                "status": booking.status.value,
-                "scheduled_time": booking.scheduled_time.isoformat() + "Z" if booking.scheduled_time else None,
-                "address": booking.address,
-                "created_at": booking.created_at.isoformat() + "Z",
-                "payment_amount": float(payment_amount) if payment_amount else 0.0,
-                "payment_status": payment_status.value if payment_status else None,
-            })
+        try:
+            recent_bookings_query = db.query(
+                Booking,
+                User.name.label("user_name"),
+                Payment.amount.label("payment_amount"),
+                Payment.status.label("payment_status"),
+            ).outerjoin(User, Booking.user_id == User.id).outerjoin(
+                Payment, Booking.id == Payment.booking_id
+            ).filter(
+                Booking.serviceprovider_id == vendor_id
+            ).order_by(Booking.created_at.desc()).limit(10).all()
+
+            for booking, user_name, payment_amount, payment_status in recent_bookings_query:
+                recent_bookings.append({
+                    "id": booking.id,
+                    "user_id": booking.user_id,
+                    "user_name": user_name or "Unknown User",
+                    "service_name": getattr(booking, "service_name", (booking.subcategory.name if booking.subcategory else "N/A")),
+                    "status": booking.status.value,
+                    "scheduled_time": booking.scheduled_time.isoformat() + "Z" if booking.scheduled_time else None,
+                    "address": booking.address,
+                    "created_at": booking.created_at.isoformat() + "Z",
+                    "payment_amount": float(payment_amount) if payment_amount else 0.0,
+                    "payment_status": payment_status.value if payment_status else None,
+                })
+        except Exception as e:
+            logger.error(f"Error fetching recent bookings: {e}")
 
         # ==================== MONTHLY REVENUE ====================
-        current_year = datetime.now().year
-        monthly_revenue_query = db.query(
-            extract("month", Payment.created_at).label("month"),
-            func.sum(Payment.amount).label("revenue"),
-            func.count(Payment.id).label("count"),
-        ).join(Booking, Payment.booking_id == Booking.id).filter(
-            and_(
-                Booking.serviceprovider_id == vendor_id,
-                Payment.status == PaymentStatus.SUCCESS,
-                extract("year", Payment.created_at) == current_year
-            )
-        ).group_by(extract("month", Payment.created_at)).all()
-
         monthly_data = []
-        for month, revenue, count in monthly_revenue_query:
-            gross_monthly = float(revenue or 0)
-            commission_monthly = gross_monthly * COMMISSION_RATE
-            net_monthly = gross_monthly - commission_monthly
+        try:
+            monthly_revenue_query = db.query(
+                extract("month", Payment.created_at).label("month"),
+                func.sum(Payment.amount).label("revenue"),
+                func.count(Payment.id).label("count"),
+            ).join(Booking, Payment.booking_id == Booking.id).filter(
+                and_(
+                    Booking.serviceprovider_id == vendor_id,
+                    Payment.status == PaymentStatus.SUCCESS,
+                    extract("year", Payment.created_at) == current_year
+                )
+            ).group_by(extract("month", Payment.created_at)).all()
 
-            monthly_data.append({
-                "month": int(month),
-                "gross_revenue": gross_monthly,
-                "commission": commission_monthly,
-                "net_revenue": net_monthly,
-                "count": count,
-                "average": net_monthly / count if count > 0 else 0
-            })
+            for month, revenue, count in monthly_revenue_query:
+                gross_monthly = float(revenue or 0)
+                commission_monthly = gross_monthly * COMMISSION_RATE
+                net_monthly = gross_monthly - commission_monthly
+
+                monthly_data.append({
+                    "month": int(month),
+                    "gross_revenue": gross_monthly,
+                    "commission": commission_monthly,
+                    "net_revenue": net_monthly,
+                    "count": count,
+                    "average": net_monthly / count if count > 0 else 0
+                })
+        except Exception as e:
+            logger.error(f"Error fetching monthly revenue: {e}")
 
         # ==================== WITHDRAWAL STATS ====================
-        withdrawal_stats = withdrawal_crud.get_vendor_withdrawal_stats(db, vendor_id)
+        try:
+            withdrawal_stats = withdrawal_crud.get_vendor_withdrawal_stats(db, vendor_id)
+        except Exception as e:
+            logger.error(f"Error fetching withdrawal stats: {e}")
+            withdrawal_stats = {
+                "total_withdrawals": 0,
+                "pending_count": 0,
+                "approved_count": 0,
+                "rejected_count": 0,
+                "total_withdrawn": 0.0,
+                "pending_amount": 0.0,
+            }
 
         # ==================== RESPONSE ====================
         return {
@@ -434,7 +478,7 @@ def get_vendor_dashboard(
                 "failed_payments": failed_payments,
             },
             "balance": {
-                "available_balance": max(0, available_balance),
+                "available_balance": max(0.0, available_balance),
                 "completed_withdrawals": completed_withdrawals,
                 "pending_withdrawals": pending_withdrawals,
                 "total_withdrawn": completed_withdrawals + pending_withdrawals,
@@ -462,4 +506,4 @@ def get_vendor_dashboard(
 
     except Exception as e:
         logger.error(f"Error generating vendor dashboard: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="We're having trouble loading your dashboard right now. Please try again later.")
+        raise HTTPException(status_code=500, detail=f"Failed to generate dashboard: {str(e)}")

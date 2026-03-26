@@ -15,8 +15,16 @@ from app.models import (
     payment_model,
     user_address,
     vendor_subcategory_charge,
-    help_center_model
+    help_center_model,
+    withdrawal_model,
+    vendor_earnings_model,
+    notification_model,
+    feedback_model,
+    report_model,
+    review_model,
+    wallet_model
 )
+
 
 from app.api.routes import (
     admin_auth,
