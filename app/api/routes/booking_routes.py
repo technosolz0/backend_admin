@@ -120,14 +120,15 @@ def create_booking(
     user_token = current_user.new_fcm_token or current_user.old_fcm_token
     send_booking_notification(db, booking, NotificationType.booking_created, current_user.email, current_user.id, user_token)
     
-    vendor = booking.service_provider
-    if vendor:
-        vendor_token = vendor.new_fcm_token or vendor.old_fcm_token
-        send_booking_notification(
-            db, booking, NotificationType.booking_created, 
-            vendor.email, vendor.id, vendor_token,
-            custom_message=f"New booking request received! Booking #{booking.id}"
-        )
+    # Vendor will be notified after successful payment in payment_routes.py
+    # vendor = booking.service_provider
+    # if vendor:
+    #     vendor_token = vendor.new_fcm_token or vendor.old_fcm_token
+    #     send_booking_notification(
+    #         db, booking, NotificationType.booking_created, 
+    #         vendor.email, vendor.id, vendor_token,
+    #         custom_message=f"New booking request received! Booking #{booking.id}"
+    #     )
 
     return enrich_booking_object(booking)
 

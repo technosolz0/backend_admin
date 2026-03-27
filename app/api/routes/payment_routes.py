@@ -615,6 +615,7 @@ from datetime import datetime, date
 from typing import List, Optional
 import logging
 
+from app.utils.fcm import send_notification, NotificationType
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -834,6 +835,23 @@ def verify_payment(
             db.commit()
 
             logger.info(f"Payment verified successfully: ID {payment.id}, Method: {specific_method}")
+
+            # --- NEW: Notify Vendor after successful payment ---
+            if booking and booking.service_provider:
+                vendor = booking.service_provider
+                vendor_token = vendor.new_fcm_token or vendor.old_fcm_token
+                try:
+                    send_notification(
+                        recipient=vendor.email,
+                        notification_type=NotificationType.booking_created,
+                        message=f"New booking payment received! Booking #{booking.id}",
+                        recipient_id=vendor.id,
+                        fcm_token=vendor_token
+                    )
+                    logger.info(f"Vendor {vendor.id} notified for booking {booking.id}")
+                except Exception as e:
+                    logger.error(f"Failed to notify vendor for booking {booking.id}: {str(e)}")
+            # ---------------------------------------------------
 
             return {
                 "status": "success",

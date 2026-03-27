@@ -6,6 +6,7 @@ from app.models.booking_model import Booking, BookingStatus
 from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
 from app.schemas.booking_schema import BookingCreate, BookingUpdate
+from app.models.payment_model import Payment, PaymentStatus
 from typing import List, Optional
 import logging
 
@@ -89,9 +90,12 @@ def get_bookings_by_user_id(db: Session, user_id: int, skip: int = 0, limit: int
     ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_vendor_id(db: Session, vendor_id: int, skip: int = 0, limit: int = 100) -> List[Booking]:
-    """Get bookings by vendor ID."""
-    return db.query(Booking).filter(
-        Booking.serviceprovider_id == vendor_id
+    """Get bookings by vendor ID that have been paid."""
+    return db.query(Booking).join(Payment, Booking.id == Payment.booking_id).filter(
+        and_(
+            Booking.serviceprovider_id == vendor_id,
+            Payment.status == PaymentStatus.SUCCESS
+        )
     ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_status(db: Session, status: BookingStatus, skip: int = 0, limit: int = 100) -> List[Booking]:
@@ -107,9 +111,13 @@ def get_bookings_by_user_and_status(db: Session, user_id: int, status: BookingSt
     ).order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_bookings_by_vendor_and_status(db: Session, vendor_id: int, status: BookingStatus, skip: int = 0, limit: int = 100) -> List[Booking]:
-    """Get bookings by vendor ID and status."""
-    return db.query(Booking).filter(
-        and_(Booking.serviceprovider_id == vendor_id, Booking.status == status)
+    """Get bookings by vendor ID and status that have been paid."""
+    return db.query(Booking).join(Payment, Booking.id == Payment.booking_id).filter(
+        and_(
+            Booking.serviceprovider_id == vendor_id,
+            Booking.status == status,
+            Payment.status == PaymentStatus.SUCCESS
+        )
     ).offset(skip).limit(limit).all()
 
 def get_bookings_by_date_range(db: Session, start_date: datetime, end_date: datetime, skip: int = 0, limit: int = 100) -> List[Booking]:
