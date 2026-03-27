@@ -40,6 +40,7 @@ class BookingOut(BaseModel):
     category_name: Optional[str] = None
     subcategory_name: Optional[str] = None
     service_name: Optional[str] = None
+    amount: float = 0.0 # NEW: Unified amount field
     
     # Location/Status
     status: BookingStatus

@@ -24,6 +24,8 @@ from app.crud import (
 from app.models.booking_model import Booking, BookingStatus
 from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
+from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
+from app.models.payment_model import Payment
 from app.utils.fcm import send_notification
 
 # --- CONFIGURATION ---
@@ -78,7 +80,7 @@ def send_booking_notification(
     except Exception as e:
         logger.error(f"FCM Notification Error for {recipient}: {str(e)}")
 
-def enrich_booking_object(booking: Booking) -> Booking:
+def enrich_booking_object(booking: Booking, db: Session) -> Booking:
     """
     Populates dynamic fields on the ORM object for Pydantic serialization.
     Using attributes instead of dictionary reconstruction for cleaner structure.
@@ -99,6 +101,23 @@ def enrich_booking_object(booking: Booking) -> Booking:
     # Coordinates
     booking.vendor_latitude = vendor.latitude if vendor else None
     booking.vendor_longitude = vendor.longitude if vendor else None
+    
+    # Calculate Amount
+    amount = 0.0
+    # 1. Try to get from payment record
+    payment = booking.payments[0] if booking.payments else None
+    if payment:
+        amount = payment.amount
+    elif vendor:
+        # 2. Fallback to vendor charge for this subcategory
+        charge = db.query(VendorSubcategoryCharge).filter(
+            VendorSubcategoryCharge.vendor_id == vendor.id,
+            VendorSubcategoryCharge.subcategory_id == booking.subcategory_id
+        ).first()
+        if charge:
+            amount = charge.service_charge
+            
+    booking.amount = amount
     
     return booking
 
@@ -130,7 +149,7 @@ def create_booking(
     #         custom_message=f"New booking request received! Booking #{booking.id}"
     #     )
 
-    return enrich_booking_object(booking)
+    return enrich_booking_object(booking, db)
 
 @router.get("", response_model=List[BookingOut])
 def list_bookings(
@@ -150,7 +169,7 @@ def list_bookings(
     elif isinstance(identity, Vendor):
         bookings = booking_crud.get_bookings_by_vendor_and_status(db, identity.id, status, skip, limit) if status else booking_crud.get_bookings_by_vendor_id(db, identity.id, skip, limit)
             
-    return [enrich_booking_object(b) for b in bookings]
+    return [enrich_booking_object(b, db) for b in bookings]
 
 @router.get("/{booking_id}", response_model=BookingOut)
 def get_booking_details(
@@ -171,7 +190,7 @@ def get_booking_details(
     if not (is_admin or is_owner or is_assigned_vendor):
         raise HTTPException(status_code=403, detail="Unauthorized access")
 
-    return enrich_booking_object(booking)
+    return enrich_booking_object(booking, db)
 
 # --- ADMIN ROUTES ---
 
@@ -205,7 +224,7 @@ def get_all_bookings_admin_dashboard(
     results = query.offset(skip).limit(limit).all()
 
     return {
-        "bookings": [enrich_booking_object(b) for b in results],
+        "bookings": [enrich_booking_object(b, db) for b in results],
         "total": total,
         "page": page,
         "limit": limit
@@ -223,7 +242,7 @@ def get_vendor_bookings(
 ):
     """Vendor's assigned bookings view"""
     bookings = booking_crud.get_bookings_by_vendor_and_status(db, vendor.id, status, skip, limit) if status else booking_crud.get_bookings_by_vendor_id(db, vendor.id, skip, limit)
-    return [enrich_booking_object(b) for b in bookings]
+    return [enrich_booking_object(b, db) for b in bookings]
 
 # --- ACTIONS & STATUS UPDATES ---
 
@@ -268,7 +287,7 @@ def update_booking_status(
                     except Exception as e:
                         logger.error(f"Earning creation failed for {booking_id}: {str(e)}")
 
-        return enrich_booking_object(updated_booking)
+        return enrich_booking_object(updated_booking, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
