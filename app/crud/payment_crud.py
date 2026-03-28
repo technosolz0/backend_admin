@@ -4,7 +4,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
-from app.models.payment_model import Payment, PaymentStatus
+from app.models.payment_model import Payment, PaymentStatus, PaymentMethod
 from app.schemas.payment_schema import PaymentCreate, PaymentUpdate
 from typing import List, Optional
 import logging
