@@ -83,7 +83,8 @@ def get_all_payments(db: Session, skip: int = 0, limit: int = 100) -> List[Payme
 
 def update_payment_status(db: Session, payment: Payment, status: PaymentStatus, 
                          razorpay_payment_id: Optional[str] = None,
-                         razorpay_signature: Optional[str] = None):
+                         razorpay_signature: Optional[str] = None,
+                         payment_method: Optional[PaymentMethod] = None):
     """Update payment status with additional Razorpay details"""
     payment.status = status
     payment.updated_at = datetime.utcnow()
@@ -93,6 +94,9 @@ def update_payment_status(db: Session, payment: Payment, status: PaymentStatus,
     
     if razorpay_signature:
         payment.razorpay_signature = razorpay_signature
+        
+    if payment_method:
+        payment.payment_method = payment_method
     
     if status == PaymentStatus.SUCCESS:
         payment.paid_at = datetime.utcnow()

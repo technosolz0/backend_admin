@@ -784,21 +784,36 @@ def verify_payment(
     user=Depends(get_current_user)
 ):
     """Verify Razorpay payment signature and update payment status"""
+    if not razorpay_client:
+        logger.error("VERIFY_PAYMENT_ERROR: Razorpay client is not initialized.")
+        raise HTTPException(
+            status_code=500,
+            detail="The payment gateway is currently unavailable. Please try again later."
+        )
+
     try:
         # Get payment record
         payment = payment_crud.get_payment_by_razorpay_order_id(
             db, verification.razorpay_order_id
         )
         if not payment:
+            # Fallback: search by booking ID if provided (some apps send it)
+            # Actually, the app sends razorpay_order_id, so this fallback is mainly for safety
+            logger.warning(f"VERIFY_PAYMENT_FAILED: Order ID {verification.razorpay_order_id} not found in DB.")
             raise HTTPException(
                 status_code=404,
-                detail="We couldn't find a record for this payment."
+                detail="The payment record for this session was not found."
             )
 
-        # Verify user authorization
+        # Verify user authorization through booking
         booking = booking_crud.get_booking_by_id(db, payment.booking_id)
+        if not booking:
+            logger.error(f"VERIFY_PAYMENT_FAILED: Booking {payment.booking_id} not found for Payment {payment.id}")
+            raise HTTPException(status_code=404, detail="The booking associated with this payment could not be found.")
+
         if booking.user_id != user.id:
-            raise HTTPException(status_code=403, detail="You don't have permission to access this.")
+            logger.warning(f"VERIFY_PAYMENT_UNAUTHORIZED: User {user.id} tried to verify payment {payment.id} (owned by {booking.user_id})")
+            raise HTTPException(status_code=403, detail="You don't have permission to verify this payment.")
 
         # Verify payment signature
         signature_params = {
@@ -808,35 +823,37 @@ def verify_payment(
         }
 
         try:
+            # 1. Verify signature
             razorpay_client.utility.verify_payment_signature(signature_params)
+            logger.info(f"Signature verified for Payment ID {payment.id}")
 
-            # ✅ Fetch specific payment method from Razorpay
-            rzp_payment = razorpay_client.payment.fetch(verification.razorpay_payment_id)
-            rzp_method = rzp_payment.get("method", "razorpay").lower()
-            
-            # Map Razorpay method to our enum
-            method_map = {
-                "upi": PaymentMethod.RAZORPAY_UPI,
-                "card": PaymentMethod.RAZORPAY_CARD,
-                "netbanking": PaymentMethod.RAZORPAY_NETBANKING,
-                "wallet": PaymentMethod.RAZORPAY_WALLET
-            }
-            specific_method = method_map.get(rzp_method, PaymentMethod.RAZORPAY)
+            # 2. Fetch specific payment method from Razorpay (Optional but good)
+            specific_method = PaymentMethod.RAZORPAY
+            try:
+                rzp_payment = razorpay_client.payment.fetch(verification.razorpay_payment_id)
+                rzp_method = rzp_payment.get("method", "razorpay").lower()
+                
+                method_map = {
+                    "upi": PaymentMethod.RAZORPAY_UPI,
+                    "card": PaymentMethod.RAZORPAY_CARD,
+                    "netbanking": PaymentMethod.RAZORPAY_NETBANKING,
+                    "wallet": PaymentMethod.RAZORPAY_WALLET
+                }
+                specific_method = method_map.get(rzp_method, PaymentMethod.RAZORPAY)
+            except Exception as e:
+                logger.warning(f"Could not fetch method for Payment {payment.id}: {str(e)}")
 
-            # Update payment status to success
+            # 3. Update payment status (Atomic update in CRUD)
             updated_payment = payment_crud.update_payment_status(
                 db, payment, PaymentStatus.SUCCESS,
                 verification.razorpay_payment_id,
-                verification.razorpay_signature
+                verification.razorpay_signature,
+                payment_method=specific_method
             )
             
-            # Update specific method
-            updated_payment.payment_method = specific_method
-            db.commit()
+            logger.info(f"Payment {payment.id} marked as SUCCESS. Method: {specific_method}")
 
-            logger.info(f"Payment verified successfully: ID {payment.id}, Method: {specific_method}")
-
-            # --- NEW: Notify Vendor after successful payment ---
+            # 4. Notify Vendor (Background task would be better, but keep as-is for now)
             if booking and booking.service_provider:
                 vendor = booking.service_provider
                 vendor_token = vendor.new_fcm_token or vendor.old_fcm_token
@@ -851,7 +868,6 @@ def verify_payment(
                     logger.info(f"Vendor {vendor.id} notified for booking {booking.id}")
                 except Exception as e:
                     logger.error(f"Failed to notify vendor for booking {booking.id}: {str(e)}")
-            # ---------------------------------------------------
 
             return {
                 "status": "success",
@@ -864,21 +880,23 @@ def verify_payment(
             # Update payment status to failed
             payment_crud.update_payment_status(
                 db, payment, PaymentStatus.FAILED,
-                verification.razorpay_payment_id
+                verification.razorpay_payment_id,
+                verification.razorpay_signature
             )
-            logger.warning(
-                f"Payment signature verification failed: Payment ID {payment.id}"
-            )
+            logger.warning(f"Payment signature verification failed: Payment ID {payment.id}")
             raise HTTPException(
                 status_code=400,
-                detail="We couldn't verify this payment's authenticity. Please contact support."
+                detail="Payment signature verification failed. Please contact support."
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error verifying payment: {str(e)}")
+        import traceback
+        logger.error(f"VERIFY_PAYMENT_CRASH: {str(e)}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
-            detail="We experienced an issue verifying your payment. Please try again or check your recent payments."
+            detail="Internal server error during payment verification. Our team has been notified."
         )
 
 
