@@ -46,7 +46,11 @@ class PaymentStatus(str, Enum):
 
 
 class PaymentMethod(str, Enum):
-    RAZORPAY = "RAZORPAY"  # match DB
+    RAZORPAY = "RAZORPAY"  # Generic RAZORPAY match
+    RAZORPAY_UPI = "RAZORPAY_UPI"
+    RAZORPAY_CARD = "RAZORPAY_CARD"
+    RAZORPAY_NETBANKING = "RAZORPAY_NETBANKING"
+    RAZORPAY_WALLET = "RAZORPAY_WALLET"
     CASH = "CASH"
     WALLET = "WALLET"
 
