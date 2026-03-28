@@ -609,8 +609,7 @@ import json
 from app.core.config import settings
 from app.core.security import get_db, get_current_user, get_current_vendor
 from app.crud import payment_crud, booking_crud
-from app.schemas.payment_schema import PaymentCreate, PaymentOut, PaymentVerification
-from app.models.payment_model import PaymentStatus, PaymentMethod
+from app.schemas.payment_schema import PaymentCreate, PaymentOut, PaymentVerification, PaymentStatus, PaymentMethod
 from datetime import datetime, date
 from typing import List, Optional
 import logging

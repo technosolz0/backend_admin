@@ -78,6 +78,7 @@ class PaymentVerification(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    booking_id: Optional[int] = None
 
 class PaymentOut(BaseModel):
     id: int
