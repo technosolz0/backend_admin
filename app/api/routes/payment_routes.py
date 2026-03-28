@@ -892,10 +892,11 @@ def verify_payment(
         raise
     except Exception as e:
         import traceback
-        logger.error(f"VERIFY_PAYMENT_CRASH: {str(e)}\n{traceback.format_exc()}")
+        error_msg = f"{str(e)}\n{traceback.format_exc()}"
+        logger.error(f"VERIFY_PAYMENT_CRASH: {error_msg}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error during payment verification. Our team has been notified."
+            detail=f"Verification Crash: {str(e)}"
         )
 
 
