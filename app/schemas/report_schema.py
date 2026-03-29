@@ -21,8 +21,10 @@ class ReportOut(ReportBase):
     id: int
     reporter_id: int
     reporter_role: ReportRole
+    reporter_name: Optional[str] = None
     reported_id: int
     reported_role: ReportRole
+    reported_name: Optional[str] = None
     status: ReportStatus
     admin_comment: Optional[str] = None
     created_at: datetime
