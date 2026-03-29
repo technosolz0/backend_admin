@@ -50,6 +50,7 @@ from app.api.routes import (
     nearby_vendor_routes,
     help_center_routes,
     admin_dashboard,
+    admin_payments,
 )
 
 # -------------------------
@@ -146,6 +147,7 @@ app.include_router(nearby_vendor_routes.router, prefix="/api", tags=["Nearby & L
 
 app.include_router(help_center_routes.router, prefix="/api/help-center", tags=["help-center"])
 app.include_router(admin_dashboard.router, prefix="/api", tags=["Admin Dashboard"])
+app.include_router(admin_payments.router, prefix="/api", tags=["Admin Payments"])
 
 # -------------------------
 # Custom OpenAPI with JWT
