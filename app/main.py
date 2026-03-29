@@ -136,7 +136,7 @@ app.include_router(vendor_bank_routes.router, prefix="/api")
 app.include_router(notification_routes.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(report_routes.router, prefix="/api", tags=["reports"])
-app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"])
+app.include_router(review_routes.router, prefix="/api", tags=["reviews"])
 app.include_router(referral_routes.router, prefix="/api")
 app.include_router(referral_stats_routes.router, prefix="/api")
 

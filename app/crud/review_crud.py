@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
-from ..models.review_model import Review
-from ..models.user import User
-from ..models.service_provider_model import ServiceProvider
-from ..models.booking_model import Booking
+from app.models.review_model import Review
+from app.models.user import User
+from app.models.service_provider_model import ServiceProvider
+from app.models.booking_model import Booking
 from typing import List, Optional, Tuple
 
 class ReviewCRUD:

@@ -2,14 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.core.security import get_db
-from ...models.review_model import Review
-from ...models.user import User
-from ...models.booking_model import Booking
-from ...crud.review_crud import ReviewCRUD
-from ...core.security import get_current_user, get_current_admin
+from app.core.security import get_db, get_current_user, get_current_admin
+from app.models.review_model import Review
+from app.models.user import User
+from app.models.booking_model import Booking
+from app.crud.review_crud import ReviewCRUD
 
-router = APIRouter()
+router = APIRouter(prefix="/reviews", tags=["Reviews"])
 
 # User routes
 @router.post("/")
