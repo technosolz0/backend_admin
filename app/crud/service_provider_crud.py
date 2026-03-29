@@ -17,7 +17,8 @@ from app.models.category import Category
 from app.models.vendor_bank_account_model import VendorBankAccount
 from app.schemas.service_provider_schema import (
     VendorCreate, VendorDeviceUpdate, AddressDetailsUpdate, 
-    BankDetailsUpdate, WorkDetailsUpdate, SubCategoryCharge, VendorResponse
+    BankDetailsUpdate, WorkDetailsUpdate, SubCategoryCharge, VendorResponse,
+    ReferralInfo
 )
 
 from app.schemas.service_provider_schema import BankAccountOut
@@ -139,6 +140,33 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
     
     bank_accounts_out = [BankAccountOut.model_validate(ba) for ba in bank_accounts]
 
+    # Referred by info
+    referred_by = None
+    if vendor.referred_by_id:
+        referrer = db.query(ServiceProvider).filter(ServiceProvider.id == vendor.referred_by_id).first()
+        if referrer:
+            referred_by = ReferralInfo(
+                id=referrer.id,
+                full_name=referrer.full_name,
+                referral_code=referrer.referral_code,
+                status=referrer.admin_status,
+                phone=referrer.phone,
+                created_at=referrer.created_at
+            )
+            
+    # Referrals made
+    referrals_made = []
+    referrals = db.query(ServiceProvider).filter(ServiceProvider.referred_by_id == vendor.id).all()
+    for r in referrals:
+        referrals_made.append(ReferralInfo(
+            id=r.id,
+            full_name=r.full_name,
+            referral_code=r.referral_code,
+            status=r.admin_status,
+            phone=r.phone,
+            created_at=r.created_at
+        ))
+
     return VendorResponse(
         id=vendor.id,
         full_name=vendor.full_name,
@@ -170,7 +198,9 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         work_status=vendor.work_status,
         subcategory_charges=subcategory_charges,
         bank_accounts=bank_accounts_out,
-        referral_code=vendor.referral_code
+        referral_code=vendor.referral_code,
+        referred_by=referred_by,
+        referrals_made=referrals_made
     )
 
 

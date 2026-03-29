@@ -85,6 +85,17 @@ class VendorDeviceUpdate(BaseModel):
     longitude: Optional[float] = None
     device_name: Optional[str] = None
 
+class ReferralInfo(BaseModel):
+    id: int
+    full_name: str
+    referral_code: Optional[str] = None
+    status: Optional[str] = None
+    phone: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 class VendorResponse(BaseModel):
     id: int
     full_name: str
@@ -122,6 +133,8 @@ class VendorResponse(BaseModel):
     subcategory_charges: List[SubCategoryCharge]
     bank_accounts: List[BankAccountOut] = []
     referral_code: Optional[str] = None
+    referred_by: Optional[ReferralInfo] = None
+    referrals_made: List[ReferralInfo] = []
 
     class Config:
         from_attributes = True
