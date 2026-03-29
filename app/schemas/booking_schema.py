@@ -36,7 +36,9 @@ class BookingOut(BaseModel):
     
     # Enriched fields for response
     user_name: Optional[str] = None
+    user_profile_pic: Optional[str] = None
     service_provider_name: Optional[str] = None
+    service_provider_profile_pic: Optional[str] = None
     category_name: Optional[str] = None
     subcategory_name: Optional[str] = None
     service_name: Optional[str] = None

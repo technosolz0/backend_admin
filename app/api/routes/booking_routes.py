@@ -93,7 +93,9 @@ def enrich_booking_object(booking: Booking, db: Session) -> Booking:
     
     # Map fields for BookingOut schema
     booking.user_name = booking.user.name if booking.user else "Unknown User"
+    booking.user_profile_pic = booking.user.profile_pic if booking.user else None
     booking.service_provider_name = vendor_name
+    booking.service_provider_profile_pic = vendor.profile_pic if vendor else None
     booking.category_name = booking.category.name if booking.category else None
     booking.subcategory_name = booking.subcategory.name if booking.subcategory else None
     booking.service_name = booking.subcategory.name if booking.subcategory else None # Default service_name to subcat
