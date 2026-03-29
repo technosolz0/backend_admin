@@ -208,26 +208,69 @@ def get_all_bookings_admin_dashboard(
     """Advanced admin view with filtering and search"""
     skip = (page - 1) * limit
     
-    # Note: Using a simplified query here, can be further delegated to CRUD
     query = db.query(Booking)
-    if status: query = query.filter(Booking.status == status)
-    if user_id: query = query.filter(Booking.user_id == user_id)
-    if vendor_id: query = query.filter(Booking.serviceprovider_id == vendor_id)
+    
+    # Apply filters
+    if status:
+        query = query.filter(Booking.status == status)
+    if user_id:
+        query = query.filter(Booking.user_id == user_id)
+    if vendor_id:
+        query = query.filter(Booking.serviceprovider_id == vendor_id)
 
+    # Search Logic
     if search:
         from sqlalchemy import or_
-        user_ids = db.query(User.id).filter(or_(User.name.ilike(f"%{search}%"), User.email.ilike(f"%{search}%"))).subquery()
-        vendor_ids = db.query(Vendor.id).filter(or_(Vendor.full_name.ilike(f"%{search}%"), Vendor.email.ilike(f"%{search}%"))).subquery()
-        query = query.filter(or_(Booking.user_id.in_(user_ids), Booking.serviceprovider_id.in_(vendor_ids), Booking.address.ilike(f"%{search}%")))
+        search_term = f"%{search}%"
+        # Find related user IDs and vendor IDs
+        found_user_ids = db.query(User.id).filter(or_(User.name.ilike(search_term), User.email.ilike(search_term), User.phone_number.ilike(search_term))).subquery()
+        found_vendor_ids = db.query(Vendor.id).filter(or_(Vendor.full_name.ilike(search_term), Vendor.business_name.ilike(search_term), Vendor.email.ilike(search_term))).subquery()
+        
+        query = query.filter(
+            or_(
+                Booking.id.cast(str).ilike(search_term),
+                Booking.user_id.in_(found_user_ids),
+                Booking.serviceprovider_id.in_(found_vendor_ids),
+                Booking.address.ilike(search_term)
+            )
+        )
 
     total = query.count()
-    results = query.offset(skip).limit(limit).all()
+    import math
+    total_pages = math.ceil(total / limit) if total > 0 else 1
+    
+    results = query.order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
+
+    # Pre-serialize to dict to ensure all enriched fields are captured correctly
+    serialized_bookings = []
+    for b in results:
+        enriched = enrich_booking_object(b, db)
+        # Convert to dict and ensure all expected fields from BookingOut are present
+        data = {
+            "id": b.id,
+            "user_id": b.user_id,
+            "serviceprovider_id": b.serviceprovider_id,
+            "category_id": b.category_id,
+            "subcategory_id": b.subcategory_id,
+            "user_name": getattr(enriched, "user_name", "Unknown User"),
+            "service_provider_name": getattr(enriched, "service_provider_name", "Unknown Provider"),
+            "category_name": getattr(enriched, "category_name", "N/A"),
+            "subcategory_name": getattr(enriched, "subcategory_name", "N/A"),
+            "service_name": getattr(enriched, "service_name", "N/A"),
+            "amount": getattr(enriched, "amount", 0.0),
+            "status": b.status.value if hasattr(b.status, 'value') else str(b.status),
+            "scheduled_time": b.scheduled_time.isoformat() if b.scheduled_time else None,
+            "address": b.address,
+            "created_at": b.created_at.isoformat() if b.created_at else None
+        }
+        serialized_bookings.append(data)
 
     return {
-        "bookings": [enrich_booking_object(b, db) for b in results],
+        "bookings": serialized_bookings,
         "total": total,
         "page": page,
-        "limit": limit
+        "limit": limit,
+        "total_pages": total_pages
     }
 
 # --- VENDOR (PARTNER APP) ROUTES ---
