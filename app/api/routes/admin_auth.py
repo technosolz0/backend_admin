@@ -47,7 +47,4 @@ def admin_login(credentials: AdminLoginSchema, db: Session = Depends(get_db)):
         }
     }
 
-# ✅ Example protected admin-only route
-@router.get("/dashboard", dependencies=[Depends(get_super_admin)])
-def admin_dashboard():
-    return {"message": "Welcome to the Admin Dashboard!"}
+
