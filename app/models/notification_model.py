@@ -10,6 +10,14 @@ class NotificationType(str, enum.Enum):
     PROMOTIONAL = "promotional"
     BOOKING_UPDATE = "booking_update"
     SYSTEM = "system"
+    # Booking specific types
+    BOOKING_CREATED = "booking_created"
+    BOOKING_ACCEPTED = "booking_accepted"
+    BOOKING_CANCELLED = "booking_cancelled"
+    BOOKING_REJECTED = "booking_rejected"
+    BOOKING_COMPLETED = "booking_completed"
+    OTP_SENT = "otp_sent"
+    PAYMENT_CREATED = "payment_created"
 
 class NotificationTarget(str, enum.Enum):
     ALL_USERS = "all_users"
@@ -25,6 +33,7 @@ class Notification(Base):
     notification_type = Column(Enum(NotificationType), default=NotificationType.GENERAL)
     target_type = Column(Enum(NotificationTarget), default=NotificationTarget.ALL_USERS)
     target_user_ids = Column(Text, nullable=True)  # JSON string of user IDs for specific users
+    reference_id = Column(Integer, nullable=True) # e.g. booking_id
     sent_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_sent = Column(Boolean, default=False)
     sent_at = Column(DateTime(timezone=True), nullable=True)

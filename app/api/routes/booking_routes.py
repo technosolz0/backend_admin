@@ -70,6 +70,25 @@ def send_booking_notification(
         message = custom_message
     
     try:
+        # 1. Store in database
+        from ...crud.notification_crud import NotificationCRUD
+        from ...models.notification_model import NotificationTarget, NotificationType as ModelNotificationType
+        
+        notification_crud = NotificationCRUD(db)
+        # Map local NotificationType to model Enum if needed, but since values match it should work
+        # target_type depends on who the recipient is. 
+        # In this app, we can determine target_type based on the recipient's role or just use SPECIFIC_USERS
+        
+        notification_crud.create_notification(
+            title=f"Booking Notification: {notification_type.value.replace('_', ' ').title()}",
+            message=message,
+            notification_type=notification_type.value, # Uses string value
+            target_type=NotificationTarget.SPECIFIC_USERS,
+            target_user_ids=[recipient_id],
+            reference_id=booking.id
+        )
+
+        # 2. Send push/email
         send_notification(
             recipient=recipient,
             notification_type=notification_type,
@@ -319,7 +338,16 @@ def update_booking_status(
         user = booking.user
         if user:
             token = user.new_fcm_token or user.old_fcm_token
-            send_booking_notification(db, updated_booking, NotificationType.booking_created, user.email, user.id, token, custom_message=notif_map.get(update_data.status))
+            # Map status to NotificationType
+            status_to_notif = {
+                BookingStatus.accepted: NotificationType.booking_accepted,
+                BookingStatus.cancelled: NotificationType.booking_cancelled,
+                BookingStatus.rejected: NotificationType.booking_rejected,
+                BookingStatus.completed: NotificationType.booking_completed
+            }
+            target_notif_type = status_to_notif.get(update_data.status, NotificationType.booking_created)
+            
+            send_booking_notification(db, updated_booking, target_notif_type, user.email, user.id, token, custom_message=notif_map.get(update_data.status))
             
             # Completion specific side-effects
             if update_data.status == BookingStatus.completed:

@@ -12,7 +12,7 @@ class NotificationCRUD:
 
     def create_notification(self, title: str, message: str, notification_type: NotificationType,
                           target_type: NotificationTarget, target_user_ids: Optional[List[int]] = None,
-                          sent_by: Optional[int] = None) -> Notification:
+                          sent_by: Optional[int] = None, reference_id: Optional[int] = None) -> Notification:
         """Create a new notification"""
 
         # Convert target_user_ids to JSON string if provided
@@ -24,7 +24,8 @@ class NotificationCRUD:
             notification_type=notification_type,
             target_type=target_type,
             target_user_ids=target_user_ids_json,
-            sent_by=sent_by
+            sent_by=sent_by,
+            reference_id=reference_id
         )
 
         self.db.add(notification)
@@ -69,6 +70,7 @@ class NotificationCRUD:
                 "title": n.title,
                 "message": n.message,
                 "type": n.notification_type,
+                "reference_id": n.reference_id,
                 "created_at": n.sent_at or n.created_at,
                 "is_read": status.is_read if status else False
             })

@@ -852,17 +852,20 @@ def verify_payment(
             
             logger.info(f"Payment {payment.id} marked as SUCCESS. Method: {specific_method}")
 
-            # 4. Notify Vendor (Background task would be better, but keep as-is for now)
+            # 4. Notify Vendor
             if booking and booking.service_provider:
                 vendor = booking.service_provider
                 vendor_token = vendor.new_fcm_token or vendor.old_fcm_token
                 try:
-                    send_notification(
+                    from .booking_routes import send_booking_notification, NotificationType as BookingNotificationType
+                    send_booking_notification(
+                        db=db,
+                        booking=booking,
+                        notification_type=BookingNotificationType.booking_created,
                         recipient=vendor.email,
-                        notification_type=NotificationType.booking_created,
-                        message=f"New booking payment received! Booking #{booking.id}",
                         recipient_id=vendor.id,
-                        fcm_token=vendor_token
+                        fcm_token=vendor_token,
+                        custom_message=f"New booking payment received! Booking #{booking.id}"
                     )
                     logger.info(f"Vendor {vendor.id} notified for booking {booking.id}")
                 except Exception as e:
