@@ -11,6 +11,8 @@ from app.crud.report_crud import ReportCRUD
 from app.models.user import User
 from app.models.service_provider_model import ServiceProvider as Vendor
 
+router = APIRouter()
+
 def enrich_report(report, db: Session):
     # Reporter
     if report.reporter_role == ReportRole.user:
