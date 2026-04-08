@@ -223,6 +223,20 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
                 "data": None
             }
         
+        # Check if phone already exists and is verified (with a different email)
+        existing_phone = db.query(ServiceProvider).filter(
+            ServiceProvider.phone == vendor.phone,
+            ServiceProvider.otp_verified == True
+        ).first()
+        
+        if existing_phone and (not existing or existing.id != existing_phone.id):
+            logger.warning(f"Vendor registration attempt with existing verified phone: {vendor.phone}")
+            return {
+                "success": False,
+                "message": "This phone number is already registered with another account. Please use a different number.",
+                "data": None
+            }
+        
         # Update existing unverified vendor
         if existing and not existing.otp_verified:
             logger.info(f"Updating existing unverified vendor: {vendor.email}")
