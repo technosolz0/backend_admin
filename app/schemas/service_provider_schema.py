@@ -70,9 +70,11 @@ class BankDetailsUpdate(BaseModel):
     account_holder_name: str
     account_number: str
     ifsc_code: str
-    upi_id: str
+    bank_name: Optional[str] = None
+    branch_name: Optional[str] = None
+    upi_id: Optional[str] = None
     bank_doc_type: str
-    bank_doc_number: str
+    bank_doc_number: Optional[str] = None
 
 class WorkDetailsUpdate(BaseModel):
     category_id: int
@@ -110,11 +112,12 @@ class VendorResponse(BaseModel):
     account_holder_name: Optional[str] = None
     account_number: Optional[str] = None
     ifsc_code: Optional[str] = None
+    bank_name: Optional[str] = None
+    branch_name: Optional[str] = None
     upi_id: Optional[str] = None
     bank_doc_type: Optional[str] = None
     bank_doc_number: Optional[str] = None
     bank_doc_url: Optional[str] = None
-
 
 
     identity_doc_type: Optional[str] = None

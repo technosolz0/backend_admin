@@ -350,6 +350,8 @@ def update_bank_details(
     account_holder_name: str = Form(...),
     account_number: str = Form(...),
     ifsc_code: str = Form(...),
+    bank_name: Optional[str] = Form(None),
+    branch_name: Optional[str] = Form(None),
     upi_id: Optional[str] = Form(None),
     bank_doc_type: str = Form(...),
     bank_doc_number: Optional[str] = Form(None),
@@ -367,6 +369,8 @@ def update_bank_details(
             account_holder_name=account_holder_name,
             account_number=account_number,
             ifsc_code=ifsc_code,
+            bank_name=bank_name,
+            branch_name=branch_name,
             upi_id=upi_id,
             bank_doc_type=bank_doc_type,
             bank_doc_number=bank_doc_number

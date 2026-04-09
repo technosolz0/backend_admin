@@ -200,7 +200,16 @@ def build_vendor_response(db: Session, vendor: ServiceProvider) -> VendorRespons
         bank_accounts=bank_accounts_out,
         referral_code=vendor.referral_code,
         referred_by=referred_by,
-        referrals_made=referrals_made
+        referrals_made=referrals_made,
+        # ✅ Pull bank_name/branch_name from primary bank account
+        bank_name=next(
+            (ba.bank_name for ba in bank_accounts if ba.is_primary and ba.bank_name),
+            None
+        ),
+        branch_name=next(
+            (ba.branch_name for ba in bank_accounts if ba.is_primary and ba.branch_name),
+            None
+        ),
     )
 
 
@@ -718,13 +727,23 @@ def update_vendor_bank(db: Session, vendor_id: int, update: BankDetailsUpdate) -
             account_holder_name=update.account_holder_name,
             account_number=update.account_number,
             ifsc_code=update.ifsc_code,
-            bank_name=None,  # Not in registration
-            branch_name=None,
+            bank_name=update.bank_name,        # ✅ Pass through from request
+            branch_name=update.branch_name,    # ✅ Pass through from request
             upi_id=update.upi_id,
             is_primary=True
         )
         vendor_bank_crud.create_bank_account(db, vendor_id, bank_data)
         logger.info(f"Created primary bank account for vendor {vendor_id} from registration")
+    else:
+        # Update existing primary bank with any new values
+        if update.bank_name is not None:
+            existing_primary.bank_name = update.bank_name
+        if update.branch_name is not None:
+            existing_primary.branch_name = update.branch_name
+        if update.upi_id is not None:
+            existing_primary.upi_id = update.upi_id
+        db.flush()
+        logger.info(f"Updated primary bank account for vendor {vendor_id}")
     
     if vendor.step == 1:
         vendor.step = 3
