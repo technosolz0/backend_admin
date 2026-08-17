@@ -16,7 +16,9 @@ from .review_model import Review
 from .help_center_model import HelpCenter
 from .withdrawal_model import Withdrawal, WithdrawalStatus
 from .vendor_earnings_model import VendorEarnings
+from .app_config_model import AppConfig
 
 from sqlalchemy.orm import configure_mappers
 configure_mappers()
+
 

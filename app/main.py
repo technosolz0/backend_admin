@@ -22,7 +22,8 @@ from app.models import (
     feedback_model,
     report_model,
     review_model,
-    wallet_model
+    wallet_model,
+    app_config_model
 )
 
 
@@ -52,6 +53,7 @@ from app.api.routes import (
     admin_dashboard,
     admin_payments,
     vendor_notification_routes,
+    app_config_routes,
 )
 
 # -------------------------
@@ -150,6 +152,7 @@ app.include_router(help_center_routes.router, prefix="/api/help-center", tags=["
 app.include_router(admin_dashboard.router, prefix="/api", tags=["Admin Dashboard"])
 app.include_router(admin_payments.router, prefix="/api", tags=["Admin Payments"])
 app.include_router(vendor_notification_routes.router, prefix="/api", tags=["Vendor Notifications"])
+app.include_router(app_config_routes.router, prefix="/api")
 
 # -------------------------
 # Custom OpenAPI with JWT
