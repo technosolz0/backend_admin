@@ -8,7 +8,7 @@ class VendorEarnings(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=False)
-    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
     total_paid = Column(Float, nullable=False)  # amount paid by user
     commission_percentage = Column(Float, default=10.0)
     commission_amount = Column(Float, nullable=False)
@@ -16,4 +16,5 @@ class VendorEarnings(Base):
     earned_at = Column(DateTime, default=datetime.utcnow)
 
     booking = relationship("Booking", backref="vendor_earnings")
-    vendor = relationship("ServiceProvider", backref="vendor_earnings")
+    vendor = relationship("Vendor", backref="vendor_earnings")
+

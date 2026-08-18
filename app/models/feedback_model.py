@@ -9,7 +9,7 @@ class Feedback(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
     is_user = Column(Boolean, default=True)
     is_vendor = Column(Boolean, default=False)
     subject = Column(String(255), nullable=False)
@@ -38,9 +38,10 @@ class Feedback(Base):
     )
 
     vendor = relationship(
-        "ServiceProvider",
+        "Vendor",
         foreign_keys=[vendor_id]
     )
+
 
 
     def __repr__(self):

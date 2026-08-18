@@ -150,7 +150,8 @@ class OTPRequest(BaseModel):
     email: str
 
 class OTPVerify(BaseModel):
-    email: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     otp: str
 
 class VendorLoginRequest(BaseModel):

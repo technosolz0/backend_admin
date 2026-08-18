@@ -5,8 +5,9 @@ from .user_address import UserAddress
 from .category import Category
 from .sub_category import SubCategory
 from .vendor_bank_account_model import VendorBankAccount
-from .service_provider_model import ServiceProvider
+from .vendor_model import Vendor, ServiceProvider
 from .vendor_subcategory_charge import VendorSubcategoryCharge
+
 from .booking_model import Booking, BookingStatus
 from .payment_model import Payment, PaymentStatus
 from .notification_model import Notification, NotificationType, NotificationTarget

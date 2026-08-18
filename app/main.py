@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import Base, engine
 from app.models import (
     user,
+    vendor_model,
     service_provider_model,
     category,
     sub_category,
@@ -31,6 +32,7 @@ from app.api.routes import (
     admin_auth,
     category_routes,
     user_routes,
+    vendor_routes,
     service_provider_routes,
     sub_category_routes,
     booking_routes,
@@ -55,6 +57,7 @@ from app.api.routes import (
     vendor_notification_routes,
     app_config_routes,
 )
+
 
 # -------------------------
 # Initialize FastAPI app
@@ -121,7 +124,9 @@ app.include_router(admin_auth.router, prefix="/api")
 app.include_router(user_routes.router, prefix="/api")
 app.include_router(category_routes.router, prefix="/api")
 app.include_router(sub_category_routes.router, prefix="/api")
+app.include_router(vendor_routes.router, prefix="/api")
 app.include_router(service_provider_routes.router, prefix="/api")
+
 app.include_router(booking_routes.router, prefix="/api")
 app.include_router(payment_routes.router, prefix="/api")
 app.include_router(user_address_routes.router, prefix="/api")

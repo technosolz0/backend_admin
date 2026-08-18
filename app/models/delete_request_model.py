@@ -8,7 +8,7 @@ class DeleteRequest(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)       # अगर user से request है
-    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=True)     # अगर vendor से request है
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)     # अगर vendor से request है
     name = Column(String, nullable=False)
     phone = Column(String, nullable=False)
     reason = Column(String, nullable=False)
@@ -24,4 +24,5 @@ class DeleteRequest(Base):
     )
 
     user = relationship("User", backref="delete_requests")
-    vendor = relationship("ServiceProvider", backref="delete_requests")
+    vendor = relationship("Vendor", backref="delete_requests")
+

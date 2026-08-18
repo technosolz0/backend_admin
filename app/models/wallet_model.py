@@ -8,7 +8,7 @@ class Wallet(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
     balance = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -21,4 +21,5 @@ class Wallet(Base):
     )
 
     user = relationship("User", backref="wallets")
-    vendor = relationship("ServiceProvider", backref="wallets")
+    vendor = relationship("Vendor", backref="wallets")
+

@@ -14,5 +14,6 @@ class Category(Base):
     status = Column(Enum(CategoryStatus), default=CategoryStatus.active)
 
     sub_categories = relationship("SubCategory", back_populates="category", cascade="all, delete")
-    vendors = relationship("ServiceProvider", back_populates="category")
+    vendors = relationship("Vendor", back_populates="category")
+
     # vendor_subcategory_charges = relationship("VendorSubcategoryCharge", back_populates="category")

@@ -9,7 +9,7 @@ class VendorBankAccount(Base):
     __tablename__ = "vendor_bank_accounts"
 
     id = Column(Integer, primary_key=True, index=True)
-    vendor_id = Column(Integer, ForeignKey("service_providers.id", ondelete="CASCADE"), nullable=False, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False, index=True)
     
     account_holder_name = Column(String(255), nullable=False)
     account_number = Column(String(50), nullable=False)
@@ -30,4 +30,4 @@ class VendorBankAccount(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationship
-    vendor = relationship("ServiceProvider", back_populates="bank_accounts")
+    vendor = relationship("Vendor", back_populates="bank_accounts")

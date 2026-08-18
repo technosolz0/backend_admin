@@ -19,7 +19,7 @@ class Withdrawal(Base):
     __tablename__ = "withdrawals"
 
     id = Column(Integer, primary_key=True, index=True)
-    vendor_id = Column(Integer, ForeignKey("service_providers.id"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
     amount = Column(Float, nullable=False)  # Amount requested (net after commission)
     gross_amount = Column(Float, nullable=False)  # Original amount before commission
     commission_amount = Column(Float, nullable=False)  # Commission deducted (10%)
@@ -35,7 +35,8 @@ class Withdrawal(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    vendor = relationship("ServiceProvider", backref="withdrawals")
+    vendor = relationship("Vendor", backref="withdrawals")
+
 
     def __repr__(self):
         return f"<Withdrawal(id={self.id}, vendor_id={self.vendor_id}, amount={self.amount}, status={self.status})>"

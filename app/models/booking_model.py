@@ -17,7 +17,10 @@ class Booking(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    serviceprovider_id = Column(Integer, ForeignKey("service_providers.id"))  # NEW_NAME: service_provider_id
+    vendor_id = Column(Integer, ForeignKey("vendors.id"))
+    # Alias for backward compatibility if needed
+    serviceprovider_id = vendor_id
+
     category_id = Column(Integer, ForeignKey("categories.id"))
     subcategory_id = Column(Integer, ForeignKey("sub_categories.id"))
     scheduled_time = Column(DateTime, nullable=True)
@@ -31,7 +34,9 @@ class Booking(Base):
     # user = relationship("User", backref="bookings")
     user = relationship("User", back_populates="bookings")
 
-    service_provider = relationship("ServiceProvider", backref="bookings")
+    vendor = relationship("Vendor", backref="bookings")
+    service_provider = vendor
+
     category = relationship("Category", backref="bookings")
     subcategory = relationship("SubCategory", backref="bookings")
     payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")
