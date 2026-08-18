@@ -73,29 +73,37 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("startup")
 def on_startup():
     """
-    Auto-create tables and add missing columns in PostgreSQL.
-    Works only for new tables and missing columns.
+    Auto-create tables and add missing columns in PostgreSQL safely.
     """
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+    try:
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.error(f"Error creating tables on startup: {e}")
 
-    # Optional: add missing columns dynamically
-    # Not recommended for production, better use Alembic
-    inspector = inspect(engine)
-    from sqlalchemy import Table, Column
-    from sqlalchemy import text
+    try:
+        inspector = inspect(engine)
+        from sqlalchemy.schema import CreateColumn
+        from sqlalchemy import text
 
-    for table in Base.metadata.tables.values():
-        table_name = table.name
-        if inspector.has_table(table_name):
-            existing_columns = [col['name'] for col in inspector.get_columns(table_name)]
-            for column in table.columns:
-                if column.name not in existing_columns:
-                    # Add missing column
-                    ddl = f'ALTER TABLE {table_name} ADD COLUMN {column.compile(dialect=engine.dialect)}'
-                    with engine.connect() as conn:
-                        conn.execute(text(ddl))
-                        conn.commit()
+        for table in Base.metadata.tables.values():
+            table_name = table.name
+            if inspector.has_table(table_name):
+                existing_columns = [col['name'] for col in inspector.get_columns(table_name)]
+                for column in table.columns:
+                    if column.name not in existing_columns:
+                        try:
+                            col_ddl = str(CreateColumn(column).compile(dialect=engine.dialect)).strip()
+                            ddl = f'ALTER TABLE "{table_name}" ADD COLUMN {col_ddl}'
+                            with engine.connect() as conn:
+                                conn.execute(text(ddl))
+                                conn.commit()
+                                logger.info(f"✅ Added missing column: {table_name}.{column.name}")
+                        except Exception as col_err:
+                            logger.warning(f"Could not auto-add column {table_name}.{column.name}: {col_err}")
+    except Exception as e:
+        logger.warning(f"Auto-column check on startup skipped: {e}")
+
 
 # -------------------------
 # CORS configuration
