@@ -1,7 +1,7 @@
 
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 import enum
 from app.database import Base
@@ -18,8 +18,8 @@ class Booking(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     vendor_id = Column(Integer, ForeignKey("vendors.id"))
-    # Alias for backward compatibility if needed
-    serviceprovider_id = vendor_id
+    serviceprovider_id = synonym("vendor_id")
+    service_provider_id = synonym("vendor_id")
 
     category_id = Column(Integer, ForeignKey("categories.id"))
     subcategory_id = Column(Integer, ForeignKey("sub_categories.id"))
@@ -30,12 +30,18 @@ class Booking(Base):
     otp = Column(String, nullable=True)
     otp_created_at = Column(DateTime, nullable=True)
 
-    # Relationships (keep as-is)
-    # user = relationship("User", backref="bookings")
+    # Relationships
     user = relationship("User", back_populates="bookings")
-
     vendor = relationship("Vendor", backref="bookings")
-    service_provider = vendor
+
+    @property
+    def service_provider(self):
+        return self.vendor
+
+    @service_provider.setter
+    def service_provider(self, value):
+        self.vendor = value
+
 
     category = relationship("Category", backref="bookings")
     subcategory = relationship("SubCategory", backref="bookings")

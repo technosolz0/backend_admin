@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, CheckConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.sql import func
 
 from ..database import Base
@@ -11,8 +11,7 @@ class Review(Base):
     booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # User who gave the review
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False)
-    # Alias for compatibility
-    service_provider_id = vendor_id
+    service_provider_id = synonym("vendor_id")
     rating = Column(Float, nullable=False)  # 1.0 to 5.0
     review_text = Column(Text, nullable=True)
     is_anonymous = Column(Boolean, default=False)
@@ -24,7 +23,15 @@ class Review(Base):
     booking = relationship("Booking", back_populates="reviews")
     user = relationship("User", foreign_keys=[user_id], back_populates="reviews")
     vendor = relationship("Vendor", back_populates="reviews")
-    service_provider = vendor
+
+    @property
+    def service_provider(self):
+        return self.vendor
+
+    @service_provider.setter
+    def service_provider(self, value):
+        self.vendor = value
+
 
     
 
