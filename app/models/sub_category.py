@@ -21,10 +21,11 @@ class SubCategory(Base):
 
     # Vendors linked through the association table (view only)
     vendors = relationship(
-        "ServiceProvider",
+        "Vendor",
         secondary="vendor_subcategory_charges",
         viewonly=True
     )
+
 
     # Association table ORM link
     vendors_association = relationship(
