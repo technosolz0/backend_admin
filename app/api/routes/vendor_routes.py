@@ -257,13 +257,18 @@ def change_password(
 
 
 @router.put("/work-status", response_model=VendorResponse)
+@router.put("/profile/work-status", response_model=VendorResponse)
 def update_work_status(
-    work_status: str = Body(..., embed=True),
+    payload: dict = Body(default={}),
+    work_status: Optional[str] = Form(None),
     current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db)
 ):
     """Update vendor work status (work_on / work_off)."""
-    return change_vendor_work_status(db, current_vendor.id, work_status)
+    status_val = payload.get("work_status") or work_status
+    if not status_val:
+        raise HTTPException(status_code=400, detail="work_status is required")
+    return change_vendor_work_status(db, current_vendor.id, status_val)
 
 
 # =================== ADMIN & PUBLIC ENDPOINTS ===================
