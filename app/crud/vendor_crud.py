@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from fastapi import HTTPException, UploadFile
 from passlib.context import CryptContext
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -68,11 +69,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_vendor_by_email(db: Session, email: str) -> Vendor:
-    """Get vendor by email."""
+    """Get vendor by email or phone number."""
     try:
-        return db.query(Vendor).filter(Vendor.email == email).first()
+        clean_identifier = email.strip()
+        return db.query(Vendor).filter(
+            or_(Vendor.email == clean_identifier, Vendor.phone == clean_identifier)
+        ).first()
     except SQLAlchemyError as e:
-        logger.error(f"Database error fetching vendor by email: {str(e)}")
+        logger.error(f"Database error fetching vendor by email/phone: {str(e)}")
         return None
 
 
@@ -980,43 +984,45 @@ def request_vendor_password_reset(db: Session, email: str) -> Dict[str, Any]:
         }
 
 
-def confirm_vendor_password_reset(db: Session, email: str, otp: str, new_password: str) -> Dict[str, Any]:
-    """Confirm vendor password reset with OTP."""
+def confirm_vendor_password_reset(db: Session, email: str, otp: Optional[str], new_password: str) -> Dict[str, Any]:
+    """Confirm vendor password reset with OTP or after phone OTP verification."""
     try:
         vendor = get_vendor_by_email(db, email)
         
         if not vendor:
-            logger.warning(f"Vendor password reset confirmation for non-existent email: {email}")
+            logger.warning(f"Vendor password reset confirmation for non-existent email/phone: {email}")
             return {
                 "success": False,
-                "message": "We couldn't find an account with this email. Please check and try again.",
+                "message": "We couldn't find an account with this email or phone number.",
                 "data": None
             }
         
-        if not vendor.otp:
-            logger.warning(f"Vendor password reset confirmation but no OTP exists for: {email}")
-            return {
-                "success": False,
-                "message": "No active password reset request found. Please request a new one.",
-                "data": None
-            }
-        
-        if vendor.otp != otp:
-            logger.warning(f"Invalid OTP for vendor password reset: {email}")
-            return {
-                "success": False,
-                "message": "The OTP you entered is incorrect. Double-check and try again.",
-                "data": None
-            }
+        if otp and otp != "FIREBASE_VERIFIED":
+            if not vendor.otp:
+                logger.warning(f"Vendor password reset confirmation but no OTP exists for: {email}")
+                return {
+                    "success": False,
+                    "message": "No active password reset request found. Please request a new one.",
+                    "data": None
+                }
+            
+            if vendor.otp != otp:
+                logger.warning(f"Invalid OTP for vendor password reset: {email}")
+                return {
+                    "success": False,
+                    "message": "The OTP you entered is incorrect. Double-check and try again.",
+                    "data": None
+                }
 
-        expiry_time = vendor.otp_created_at + timedelta(minutes=5)
-        if datetime.utcnow() > expiry_time:
-            logger.warning(f"Expired OTP for vendor password reset: {email}")
-            return {
-                "success": False,
-                "message": "This OTP has expired. Please request a new password reset.",
-                "data": None
-            }
+            if vendor.otp_created_at:
+                expiry_time = vendor.otp_created_at + timedelta(minutes=5)
+                if datetime.utcnow() > expiry_time:
+                    logger.warning(f"Expired OTP for vendor password reset: {email}")
+                    return {
+                        "success": False,
+                        "message": "This OTP has expired. Please request a new password reset.",
+                        "data": None
+                    }
 
         vendor.password = get_password_hash(new_password)
         vendor.otp = None

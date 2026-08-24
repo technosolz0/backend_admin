@@ -170,5 +170,5 @@ class VendorPasswordResetRequest(BaseModel):
 
 class VendorPasswordResetConfirm(BaseModel):
     email: str
-    otp: str
+    otp: Optional[str] = None
     new_password: str

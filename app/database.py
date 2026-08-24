@@ -16,6 +16,8 @@ ECHO_SQL = os.getenv("SQL_ECHO", "false").lower() == "true"
 engine = create_engine(
     DATABASE_URL,
     echo=ECHO_SQL,
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 
 
