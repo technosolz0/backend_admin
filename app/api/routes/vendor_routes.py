@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, status, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -187,12 +187,31 @@ def reset_password(data: VendorPasswordResetConfirm, db: Session = Depends(get_d
 # =================== VENDOR PROFILE ENDPOINTS ===================
 
 @router.get("/me", response_model=VendorResponse)
+@router.get("/profile", response_model=VendorResponse)
 def get_vendor_profile(
     current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db)
 ):
     """Get current logged-in vendor's profile."""
     return build_vendor_response(db, current_vendor)
+
+
+@router.get("/categories", response_model=List[CategoryOut])
+def get_vendor_categories(db: Session = Depends(get_db)):
+    """List all categories for vendor selection."""
+    return db.query(Category).all()
+
+
+@router.get("/subcategories", response_model=List[SubCategoryOut])
+def get_vendor_subcategories(
+    category_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """List subcategories for vendor selection."""
+    query = db.query(SubCategory)
+    if category_id is not None:
+        query = query.filter(SubCategory.category_id == category_id)
+    return query.all()
 
 
 @router.put("/update-address", response_model=VendorResponse)
@@ -258,14 +277,33 @@ def change_password(
 
 @router.put("/work-status", response_model=VendorResponse)
 @router.put("/profile/work-status", response_model=VendorResponse)
-def update_work_status(
-    payload: dict = Body(default={}),
-    work_status: Optional[str] = Form(None),
+async def update_work_status(
+    request: Request,
     current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db)
 ):
     """Update vendor work status (work_on / work_off)."""
-    status_val = payload.get("work_status") or work_status
+    status_val = None
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        try:
+            body_data = await request.json()
+            if isinstance(body_data, dict):
+                status_val = body_data.get("work_status")
+        except Exception:
+            pass
+
+    if not status_val and ("form" in content_type or "multipart" in content_type):
+        try:
+            form_data = await request.form()
+            status_val = form_data.get("work_status")
+        except Exception:
+            pass
+
+    if not status_val:
+        status_val = request.query_params.get("work_status")
+
     if not status_val:
         raise HTTPException(status_code=400, detail="work_status is required")
     return change_vendor_work_status(db, current_vendor.id, status_val)
