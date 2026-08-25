@@ -2,7 +2,7 @@
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import logging
@@ -63,15 +63,25 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
                 "data": None
             }
 
-        # Check if mobile already exists and is verified
+        # Check if mobile already exists for a different user
         existing_mobile = get_user_by_mobile(db, user.mobile)
-        if existing_mobile and existing_mobile.is_verified and existing_mobile.email != user.email:
-            logger.warning(f"Registration attempt with existing verified mobile: {user.mobile}")
-            return {
-                "success": False,
-                "message": "This mobile number is already registered with another account.",
-                "data": None
-            }
+        if existing_mobile and existing_mobile.email != user.email:
+            if existing_mobile.is_verified:
+                logger.warning(f"Registration attempt with existing verified mobile: {user.mobile}")
+                return {
+                    "success": False,
+                    "message": "This mobile number is already registered with another account.",
+                    "data": None
+                }
+            else:
+                # Delete stale unverified record with same mobile so user can re-register
+                logger.info(f"Removing unverified stale record for mobile: {user.mobile}")
+                try:
+                    db.delete(existing_mobile)
+                    db.commit()
+                except Exception as del_err:
+                    db.rollback()
+                    logger.warning(f"Failed to delete stale mobile record: {del_err}")
 
         otp = generate_otp()
         hashed_password = get_password_hash(user.password)
@@ -141,6 +151,14 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
             "data": db_user
         }
 
+    except IntegrityError as e:
+        db.rollback()
+        logger.warning(f"IntegrityError in create_user_with_otp: {str(e)}")
+        return {
+            "success": False,
+            "message": "This email or mobile number is already registered. Please check your details or try logging in.",
+            "data": None
+        }
     except SQLAlchemyError as e:
         db.rollback()
         logger.exception(f"Database error in create_user_with_otp: {str(e)}")
