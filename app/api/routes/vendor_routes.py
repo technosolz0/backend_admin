@@ -8,7 +8,8 @@ from app.models.sub_category import SubCategory
 from app.schemas.service_provider_schema import (
     PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest,
-    VendorChangePasswordRequest, VendorPasswordResetRequest, VendorPasswordResetConfirm
+    VendorChangePasswordRequest, VendorPasswordResetRequest, VendorPasswordResetConfirm,
+    SubCategoryCharge
 )
 from app.core.security import create_access_token, get_current_vendor, get_db
 from app.crud.vendor_crud import (
@@ -16,7 +17,7 @@ from app.crud.vendor_crud import (
     update_vendor_address, update_vendor_bank, update_vendor_work, 
     update_vendor_documents, change_vendor_admin_status, change_vendor_work_status, 
     vendor_login, get_all_vendors, delete_vendor, build_vendor_response,
-    change_vendor_password
+    change_vendor_password, get_vendor_by_id
 )
 from app.schemas.category_schema import CategoryOut
 from app.schemas.sub_category_schema import SubCategoryOut
@@ -311,6 +312,8 @@ async def update_work_status(
 
 # =================== ADMIN & PUBLIC ENDPOINTS ===================
 
+@router.get("", response_model=PaginatedVendorsResponse)
+@router.get("/", response_model=PaginatedVendorsResponse)
 @router.get("/all", response_model=PaginatedVendorsResponse)
 def get_vendors(
     page: int = Query(1, ge=1),
@@ -330,6 +333,15 @@ def get_vendors(
     )
 
 
+@router.get("/{vendor_id}", response_model=VendorResponse)
+def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
+    """Get single vendor by ID."""
+    vendor = get_vendor_by_id(db, vendor_id)
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Vendor {vendor_id} not found")
+    return build_vendor_response(db, vendor)
+
+
 @router.delete("/{vendor_id}", response_model=dict)
 def remove_vendor(vendor_id: int, db: Session = Depends(get_db)):
     """Delete vendor by ID."""
@@ -345,3 +357,91 @@ def update_admin_status(
 ):
     """Update vendor admin status (active / inactive)."""
     return change_vendor_admin_status(db, vendor_id, admin_status)
+
+
+@router.put("/admin/status", response_model=VendorResponse)
+async def admin_update_status(request: Request, db: Session = Depends(get_db)):
+    """Update vendor admin status via form or JSON data."""
+    vendor_id = None
+    admin_status = None
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            vendor_id = data.get("vendor_id")
+            admin_status = data.get("admin_status")
+        except Exception:
+            pass
+    
+    if not vendor_id or not admin_status:
+        try:
+            form = await request.form()
+            vendor_id = form.get("vendor_id")
+            admin_status = form.get("admin_status")
+        except Exception:
+            pass
+
+    if not vendor_id or not admin_status:
+        raise HTTPException(status_code=400, detail="vendor_id and admin_status are required")
+    
+    return change_vendor_admin_status(db, int(vendor_id), str(admin_status))
+
+
+@router.put("/profile/work", response_model=VendorResponse)
+@router.put("/{vendor_id}/work", response_model=VendorResponse)
+async def admin_update_work(request: Request, db: Session = Depends(get_db)):
+    """Admin update vendor work details."""
+    data = await request.json()
+    vendor_id = data.get("vendor_id")
+    category_id = data.get("category_id")
+    subcategory_charges_raw = data.get("subcategory_charges", [])
+    
+    if not vendor_id or not category_id:
+        raise HTTPException(status_code=400, detail="vendor_id and category_id are required")
+        
+    charges = [
+        SubCategoryCharge(
+            subcategory_id=c.get("subcategory_id"),
+            subcategory_name=c.get("subcategory_name"),
+            service_charge=float(c.get("service_charge", 0.0))
+        )
+        for c in subcategory_charges_raw if c.get("subcategory_id")
+    ]
+    
+    update = WorkDetailsUpdate(
+        category_id=int(category_id),
+        subcategory_charges=charges
+    )
+    return update_vendor_work(db, int(vendor_id), update)
+
+
+@router.put("/profile/address", response_model=VendorResponse)
+@router.put("/{vendor_id}/address", response_model=VendorResponse)
+async def admin_update_address(request: Request, db: Session = Depends(get_db)):
+    """Admin update vendor address/profile details."""
+    form = await request.form()
+    vendor_id = form.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=400, detail="vendor_id is required")
+    vendor = get_vendor_by_id(db, int(vendor_id))
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    if form.get("full_name"):
+        vendor.full_name = form.get("full_name")
+    if form.get("email"):
+        vendor.email = form.get("email")
+    if form.get("phone"):
+        vendor.phone = form.get("phone")
+    if form.get("address"):
+        vendor.address = form.get("address")
+    if form.get("city"):
+        vendor.city = form.get("city")
+    if form.get("state"):
+        vendor.state = form.get("state")
+    if form.get("pincode"):
+        vendor.pincode = form.get("pincode")
+    db.commit()
+    db.refresh(vendor)
+    return build_vendor_response(db, vendor)
+
