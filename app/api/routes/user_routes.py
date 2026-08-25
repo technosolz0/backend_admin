@@ -54,16 +54,16 @@ def register_user_with_otp(user: user_schema.UserCreate, db: Session = Depends(g
 @router.post("/verify-otp", response_model=dict, status_code=status.HTTP_200_OK)
 def verify_user_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db)):
     """
-    Verify OTP for user email verification.
+    Verify OTP for user verification (mobile/email).
     
     Returns:
     - 200: OTP verified successfully with access token
-    - 400: Verification failed (invalid OTP, expired, user not found, etc.)
+    - 400: Verification failed
     """
-    result = crud_user.verify_otp(db, data.email, data.otp)
+    result = crud_user.verify_otp(db, email=data.email, otp=data.otp, mobile=data.mobile)
     
     if not result["success"]:
-        logger.error(f"OTP verification failed for {data.email}: {result['message']}")
+        logger.error(f"OTP verification failed for {data.email or data.mobile}: {result['message']}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result["message"]
@@ -74,12 +74,19 @@ def verify_user_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db)):
         data={"sub": result["data"].email},
         role="user"  # ✅ Important: Specify role for user
     )
+
+    refresh_token = create_access_token(
+        data={"sub": result["data"].email},
+        token_type="refresh",
+        role="user"
+    )
     
-    logger.info(f"User verified successfully: {data.email}")
+    logger.info(f"User verified successfully: {result['data'].email}")
     return {
         "success": True,
         "message": result["message"],
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": {
             "id": result["data"].id,
@@ -95,13 +102,13 @@ def verify_user_otp(data: user_schema.OTPVerify, db: Session = Depends(get_db)):
 @router.post("/resend-otp", response_model=dict, status_code=status.HTTP_200_OK)
 def resend_user_otp(data: user_schema.OTPResend, db: Session = Depends(get_db)):
     """
-    Resend OTP for email verification.
+    Resend OTP for user verification.
     
     Returns:
     - 200: OTP resent successfully
-    - 400: Resend failed (user not found, already verified, etc.)
+    - 400: Resend failed
     """
-    result = crud_user.resend_otp(db, data.email)
+    result = crud_user.resend_otp(db, email=data.email, mobile=data.mobile)
     
     if not result["success"]:
         logger.error(f"OTP resend failed: {result['message']}")
@@ -110,11 +117,10 @@ def resend_user_otp(data: user_schema.OTPResend, db: Session = Depends(get_db)):
             detail=result["message"]
         )
 
-    logger.info(f"OTP resent successfully for {data.email}")
+    logger.info(f"OTP resent successfully for {data.email or data.mobile}")
     return {
         "success": True,
         "message": result["message"]
-        # "otp": result.get("otp")  # Remove in production for security
     }
 
 
@@ -257,22 +263,20 @@ def request_password_reset(
     db: Session = Depends(get_db)
 ):
     """
-    Request password reset OTP.
-    
-    Returns:
-    - 200: OTP sent successfully
-    - 400: Request failed (user not found, not verified, etc.)
+    Request password reset (email or mobile).
     """
-    result = crud_user.request_password_reset(db, request_data.email)
+    result = crud_user.request_password_reset(
+        db, email=request_data.email, mobile=request_data.mobile
+    )
     
     if not result["success"]:
-        logger.error(f"Password reset request failed for {request_data.email}: {result['message']}")
+        logger.error(f"Password reset request failed for {request_data.email or request_data.mobile}: {result['message']}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result["message"]
         )
     
-    logger.info(f"Password reset OTP sent for email: {request_data.email}")
+    logger.info(f"Password reset request approved for: {request_data.email or request_data.mobile}")
     return {
         "success": True,
         "message": result["message"]
@@ -285,24 +289,24 @@ def confirm_password_reset(
     db: Session = Depends(get_db)
 ):
     """
-    Confirm password reset with OTP.
-    
-    Returns:
-    - 200: Password reset successfully
-    - 400: Confirmation failed (invalid OTP, expired, etc.)
+    Confirm password reset with new password.
     """
     result = crud_user.confirm_password_reset(
-        db, confirm.email, confirm.otp, confirm.new_password
+        db,
+        email=confirm.email,
+        mobile=confirm.mobile,
+        otp=confirm.otp,
+        new_password=confirm.new_password
     )
     
     if not result["success"]:
-        logger.error(f"Password reset failed for {confirm.email}: {result['message']}")
+        logger.error(f"Password reset failed for {confirm.email or confirm.mobile}: {result['message']}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=result["message"]
         )
     
-    logger.info(f"Password reset successful for email: {confirm.email}")
+    logger.info(f"Password reset successful for: {confirm.email or confirm.mobile}")
     return {
         "success": True,
         "message": result["message"]

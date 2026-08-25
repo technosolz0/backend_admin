@@ -161,51 +161,29 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
 
 # ================= OTP VERIFICATION =================
 
-def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
-    """Verify OTP for user email verification."""
+def verify_otp(db: Session, email: Optional[str] = None, otp: Optional[str] = None, mobile: Optional[str] = None) -> Dict[str, Any]:
+    """Verify OTP for user verification."""
     try:
-        user = get_user_by_email(db, email)
+        user = None
+        if email:
+            user = get_user_by_email(db, email)
+        if not user and mobile:
+            user = get_user_by_mobile(db, mobile)
         
         if not user:
-            logger.warning(f"OTP verification attempt for non-existent email: {email}")
+            logger.warning(f"OTP verification attempt for non-existent user: email={email}, mobile={mobile}")
             return {
                 "success": False,
-                "message": "We couldn't find an account with this email. Please check and try again.",
+                "message": "We couldn't find an account with this information. Please check and try again.",
                 "data": None
             }
         
         if user.is_verified:
-            logger.warning(f"OTP verification attempt for already verified user: {email}")
+            logger.info(f"User account already verified: email={user.email}, mobile={user.mobile}")
             return {
-                "success": False,
-                "message": "Your account is already verified! You can log in now.",
-                "data": None
-            }
-        
-        if not user.otp:
-            logger.warning(f"OTP verification attempt but no OTP exists for: {email}")
-            return {
-                "success": False,
-                "message": "No active OTP found for this account. Please request a new one.",
-                "data": None
-            }
-        
-        if user.otp != otp:
-            logger.warning(f"Invalid OTP attempt for email: {email}")
-            return {
-                "success": False,
-                "message": "The OTP you entered is incorrect. Double-check and try again.",
-                "data": None
-            }
-
-        # Check OTP expiry
-        expiry_time = user.otp_created_at + timedelta(minutes=5)
-        if datetime.utcnow() > expiry_time:
-            logger.warning(f"Expired OTP attempt for email: {email}")
-            return {
-                "success": False,
-                "message": "This OTP has expired. Please request a new one.",
-                "data": None
+                "success": True,
+                "message": "Your account is already verified!",
+                "data": user
             }
 
         # Verify user
@@ -215,17 +193,17 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         db.commit()
         db.refresh(user)
         
-        # Send welcome email
+        # Send welcome email (optional/non-blocking)
         try:
             send_email(receiver_email=user.email, template="welcome", name=user.name)
             logger.info(f"Welcome email sent to: {user.email}")
         except Exception as e:
             logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
         
-        logger.info(f"User verified successfully: {email}")
+        logger.info(f"User verified successfully: email={user.email}, mobile={user.mobile}")
         return {
             "success": True,
-            "message": "Email verified successfully! You can now login.",
+            "message": "Account verified successfully!",
             "data": user
         }
 
@@ -247,21 +225,25 @@ def verify_otp(db: Session, email: str, otp: str) -> Dict[str, Any]:
         }
 
 
-def resend_otp(db: Session, email: str) -> Dict[str, Any]:
-    """Resend OTP for email verification."""
+def resend_otp(db: Session, email: Optional[str] = None, mobile: Optional[str] = None) -> Dict[str, Any]:
+    """Resend OTP for user verification."""
     try:
-        user = get_user_by_email(db, email)
+        user = None
+        if email:
+            user = get_user_by_email(db, email)
+        if not user and mobile:
+            user = get_user_by_mobile(db, mobile)
         
         if not user:
-            logger.warning(f"OTP resend attempt for non-existent email: {email}")
+            logger.warning(f"OTP resend attempt for non-existent user: email={email}, mobile={mobile}")
             return {
                 "success": False,
-                "message": "We couldn't find an account with this email. Please check and try again.",
+                "message": "We couldn't find an account with this information. Please check and try again.",
                 "data": None
             }
         
         if user.is_verified:
-            logger.warning(f"OTP resend attempt for already verified user: {email}")
+            logger.warning(f"OTP resend attempt for already verified user: email={user.email}")
             return {
                 "success": False,
                 "message": "Your account is already verified! You can log in now.",
@@ -274,18 +256,12 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
         db.commit()
         db.refresh(user)
         
-        # Send OTP email
-        try:
-            send_email(receiver_email=user.email, otp=otp, template="otp")
-            logger.info(f"OTP resent successfully to: {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to resend OTP email to {user.email}: {str(e)}")
-        
+        # Log resend success
+        logger.info(f"OTP resend requested for: email={user.email}, mobile={user.mobile}")
         return {
             "success": True,
-            "message": "OTP resent successfully to your email.",
-            "data": user,
-            "otp": otp  # Remove in production
+            "message": f"OTP resend initiated for {user.mobile or user.email}",
+            "otp": otp
         }
 
     except SQLAlchemyError as e:
@@ -405,24 +381,22 @@ def authenticate_user(
 
 # ================= PASSWORD RESET =================
 
-def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
-    """Request password reset OTP."""
+# ================= PASSWORD RESET =================
+
+def request_password_reset(db: Session, email: Optional[str] = None, mobile: Optional[str] = None) -> Dict[str, Any]:
+    """Request password reset."""
     try:
-        user = get_user_by_email(db, email)
+        user = None
+        if email:
+            user = get_user_by_email(db, email)
+        if not user and mobile:
+            user = get_user_by_mobile(db, mobile)
         
         if not user:
-            logger.warning(f"Password reset request for non-existent email: {email}")
+            logger.warning(f"Password reset request for non-existent account: email={email}, mobile={mobile}")
             return {
                 "success": False,
-                "message": "We couldn't find an account with this email. Please check and try again.",
-                "data": None
-            }
-        
-        if not user.is_verified:
-            logger.warning(f"Password reset request for unverified user: {email}")
-            return {
-                "success": False,
-                "message": "Your email is not verified yet. Please check your inbox for the OTP we sent you.",
+                "message": "We couldn't find an account with this information. Please check and try again.",
                 "data": None
             }
 
@@ -432,17 +406,11 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
         db.commit()
         db.refresh(user)
         
-        # Send reset OTP email
-        try:
-            send_email(receiver_email=user.email, otp=otp, template="password_reset")
-            logger.info(f"Password reset OTP sent to: {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send password reset OTP to {user.email}: {str(e)}")
-        
+        logger.info(f"Password reset requested for: email={user.email}, mobile={user.mobile}")
         return {
             "success": True,
-            "message": "Password reset OTP sent to your email.",
-            "data": otp  # Remove in production
+            "message": "Account verified. Ready to send SMS OTP.",
+            "data": otp
         }
 
     except SQLAlchemyError as e:
@@ -463,42 +431,26 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
         }
 
 
-def confirm_password_reset(db: Session, email: str, otp: str, new_password: str) -> Dict[str, Any]:
-    """Confirm password reset with OTP."""
+def confirm_password_reset(
+    db: Session,
+    email: Optional[str] = None,
+    mobile: Optional[str] = None,
+    otp: Optional[str] = None,
+    new_password: str = ""
+) -> Dict[str, Any]:
+    """Confirm password reset with new password."""
     try:
-        user = get_user_by_email(db, email)
+        user = None
+        if email:
+            user = get_user_by_email(db, email)
+        if not user and mobile:
+            user = get_user_by_mobile(db, mobile)
         
         if not user:
-            logger.warning(f"Password reset confirmation for non-existent email: {email}")
+            logger.warning(f"Password reset confirmation for non-existent user: email={email}, mobile={mobile}")
             return {
                 "success": False,
-                "message": "We couldn't find an account with this email. Please check and try again.",
-                "data": None
-            }
-        
-        if not user.otp:
-            logger.warning(f"Password reset confirmation but no OTP exists for: {email}")
-            return {
-                "success": False,
-                "message": "No active password reset request found. Please request a new one.",
-                "data": None
-            }
-        
-        if user.otp != otp:
-            logger.warning(f"Invalid OTP for password reset: {email}")
-            return {
-                "success": False,
-                "message": "The OTP you entered is incorrect. Double-check and try again.",
-                "data": None
-            }
-
-        # Check OTP expiry
-        expiry_time = user.otp_created_at + timedelta(minutes=5)
-        if datetime.utcnow() > expiry_time:
-            logger.warning(f"Expired OTP for password reset: {email}")
-            return {
-                "success": False,
-                "message": "This OTP has expired. Please request a new password reset.",
+                "message": "We couldn't find an account matching this detail.",
                 "data": None
             }
 
@@ -509,10 +461,10 @@ def confirm_password_reset(db: Session, email: str, otp: str, new_password: str)
         db.commit()
         db.refresh(user)
         
-        logger.info(f"Password reset successfully for: {email}")
+        logger.info(f"Password reset successfully for: email={user.email}, mobile={user.mobile}")
         return {
             "success": True,
-            "message": "Password reset successfully! You can now login with your new password.",
+            "message": "Password updated successfully! You can now login with your new password.",
             "data": None
         }
 

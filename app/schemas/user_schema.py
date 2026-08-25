@@ -42,12 +42,14 @@ class UserUpdate(BaseModel):
 
 
 class OTPVerify(BaseModel):
-    email: str
-    otp: str
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    otp: Optional[str] = None
 
 
 class OTPResend(BaseModel):
-    email: str
+    email: Optional[str] = None
+    mobile: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -61,12 +63,14 @@ class LoginRequest(BaseModel):
 
 
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
+    mobile: Optional[str] = None
 
 
 class PasswordResetConfirm(BaseModel):
-    email: str
-    otp: str
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    otp: Optional[str] = None
     new_password: str
 
 

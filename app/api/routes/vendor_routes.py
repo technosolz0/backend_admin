@@ -305,7 +305,7 @@ async def update_work_status(
         status_val = request.query_params.get("work_status")
 
     if not status_val:
-        raise HTTPException(status_code=400, detail="work_status is required")
+        raise HTTPException(status_code=400, detail="work status is required")
     return change_vendor_work_status(db, current_vendor.id, status_val)
 
 
