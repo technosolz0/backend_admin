@@ -1,4 +1,13 @@
 
+import logging
+import bcrypt
+
+# Passlib compatibility patch for bcrypt >= 4.0.0
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("about", (), {"__version__": getattr(bcrypt, "__version__", "4.0.0")})
+
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware

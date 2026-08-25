@@ -1,5 +1,11 @@
 from datetime import datetime, timedelta
 from fastapi import HTTPException, UploadFile
+import bcrypt
+
+# Passlib compatibility patch for bcrypt >= 4.0.0
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("about", (), {"__version__": getattr(bcrypt, "__version__", "4.0.0")})
+
 from passlib.context import CryptContext
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
