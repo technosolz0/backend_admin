@@ -44,13 +44,23 @@ def update_booking_status(db: Session, booking: Booking, status: BookingStatus, 
     old_status = booking.status
     booking.status = status
     booking.updated_at = datetime.utcnow()
-    if status == BookingStatus.completed:
+    
+    if status == BookingStatus.accepted:
+        booking.tracking_status = "ACTIVE"
+        if not booking.tracking_started_at:
+            booking.tracking_started_at = datetime.utcnow()
+    elif status == BookingStatus.completed:
         booking.completed_at = datetime.utcnow()
+        booking.tracking_status = "COMPLETED"
+        booking.tracking_ended_at = datetime.utcnow()
+    elif status == BookingStatus.cancelled:
+        booking.tracking_status = "CANCELLED"
+        booking.tracking_ended_at = datetime.utcnow()
 
     db.commit()
     db.refresh(booking)
     
-    logger.info(f"Booking {booking.id} status updated to {status}")
+    logger.info(f"Booking {booking.id} status updated to {status} (tracking: {booking.tracking_status})")
     return booking
 
 def update_booking(db: Session, booking_id: int, booking_update: BookingUpdate) -> Optional[Booking]:

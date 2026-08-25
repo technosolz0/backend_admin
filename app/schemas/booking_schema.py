@@ -16,11 +16,15 @@ class BookingCreate(BaseModel):
     subcategory_id: int = Field(..., description="Subcategory ID")
     scheduled_time: datetime = Field(..., description="Scheduled datetime for booking")
     address: str = Field(..., description="Booking address")
+    booking_latitude: Optional[float] = Field(None, description="Booked service location latitude")
+    booking_longitude: Optional[float] = Field(None, description="Booked service location longitude")
     status: Optional[BookingStatus] = Field(BookingStatus.pending, description="Booking status")
 
 class BookingUpdate(BaseModel):
     scheduled_time: Optional[datetime] = None
     address: Optional[str] = None
+    booking_latitude: Optional[float] = None
+    booking_longitude: Optional[float] = None
 
 class BookingStatusUpdate(BaseModel):
     status: BookingStatus
@@ -46,16 +50,23 @@ class BookingOut(BaseModel):
     
     # Location/Status
     status: BookingStatus
+    tracking_status: Optional[str] = "NOT_STARTED"
     scheduled_time: Optional[datetime] = None
     address: str
     booking_latitude: Optional[float] = None
     booking_longitude: Optional[float] = None
     vendor_latitude: Optional[float] = None
     vendor_longitude: Optional[float] = None
+    latest_vendor_latitude: Optional[float] = None
+    latest_vendor_longitude: Optional[float] = None
+    latest_vendor_location_updated_at: Optional[datetime] = None
     
     # Timing/Secret
     otp: Optional[str] = None
     created_at: datetime
+    tracking_started_at: Optional[datetime] = None
+    vendor_arrived_at: Optional[datetime] = None
+    tracking_ended_at: Optional[datetime] = None
     otp_created_at: Optional[datetime] = None
 
     class Config:

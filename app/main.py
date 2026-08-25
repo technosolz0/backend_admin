@@ -51,6 +51,7 @@ from app.api.routes import (
     referral_routes,
     referral_stats_routes,
     nearby_vendor_routes,
+    tracking_routes,
     help_center_routes,
     admin_dashboard,
     admin_payments,
@@ -160,6 +161,7 @@ app.include_router(referral_stats_routes.router, prefix="/api")
 # Nearby Vendor + Live Location + Booking Flow
 # =============================================
 app.include_router(nearby_vendor_routes.router, prefix="/api", tags=["Nearby & Location"])
+app.include_router(tracking_routes.router, prefix="/api", tags=["Live Tracking"])
 
 app.include_router(help_center_routes.router, prefix="/api/help-center", tags=["help-center"])
 app.include_router(admin_dashboard.router, prefix="/api", tags=["Admin Dashboard"])
