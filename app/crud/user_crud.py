@@ -104,6 +104,14 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
             db.commit()
             db.refresh(existing_user)
             
+            try:
+                from app.services.referral_service import generate_unique_user_referral_code, process_user_referral_registration
+                generate_unique_user_referral_code(db, existing_user)
+                if getattr(user, 'referral_code', None):
+                    process_user_referral_registration(db, existing_user, user.referral_code)
+            except Exception as ref_err:
+                logger.warning(f"User referral processing warning: {ref_err}")
+
             # Send OTP email
             try:
                 send_email(receiver_email=user.email, otp=otp, template="otp")
@@ -137,6 +145,14 @@ def create_user_with_otp(db: Session, user: user_schema.UserCreate) -> Dict[str,
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+
+        try:
+            from app.services.referral_service import generate_unique_user_referral_code, process_user_referral_registration
+            generate_unique_user_referral_code(db, db_user)
+            if getattr(user, 'referral_code', None):
+                process_user_referral_registration(db, db_user, user.referral_code)
+        except Exception as ref_err:
+            logger.warning(f"User referral processing warning: {ref_err}")
         
         # Send OTP email
         try:
@@ -211,6 +227,12 @@ def verify_otp(db: Session, email: Optional[str] = None, otp: Optional[str] = No
         db.commit()
         db.refresh(user)
         
+        try:
+            from app.services.referral_service import generate_unique_user_referral_code
+            generate_unique_user_referral_code(db, user)
+        except Exception as ref_err:
+            logger.warning(f"Failed generating user referral code on OTP verify: {ref_err}")
+
         # Send welcome email (optional/non-blocking)
         try:
             send_email(receiver_email=user.email, template="welcome", name=user.name)

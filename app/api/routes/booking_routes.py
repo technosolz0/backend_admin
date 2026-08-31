@@ -360,10 +360,11 @@ def update_booking_status(
                     except Exception as e:
                         logger.error(f"Earning creation failed for {booking_id}: {str(e)}")
 
-                # Process vendor referral reward qualification on 1st completed booking
+                # Process vendor & user referral reward qualification on 1st completed booking
                 try:
-                    from app.services.referral_service import process_first_booking_referral_reward
+                    from app.services.referral_service import process_first_booking_referral_reward, process_first_user_booking_referral_reward
                     process_first_booking_referral_reward(db, updated_booking)
+                    process_first_user_booking_referral_reward(db, updated_booking)
                 except Exception as ref_err:
                     logger.error(f"Referral reward processing failed for booking {booking_id}: {str(ref_err)}")
 

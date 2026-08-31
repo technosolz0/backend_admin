@@ -34,6 +34,10 @@ class User(Base):
     app_version = Column(String, nullable=True)  # e.g., 1.0.0
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String, nullable=True)
+    referral_code = Column(String, unique=True, index=True, nullable=True)
+    referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    applied_referral_code = Column(String, nullable=True)
+    referral_type = Column(String, nullable=True)  # 'user'
     addresses = relationship("UserAddress", back_populates="user", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="user")
     sent_notifications = relationship("Notification", back_populates="sender", cascade="all, delete-orphan")

@@ -33,9 +33,10 @@ class WalletTransaction(Base):
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     referral_id = Column(Integer, ForeignKey("vendor_referrals.id"), nullable=True)
+    user_referral_id = Column(Integer, ForeignKey("user_referrals.id"), nullable=True)
     booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)
     amount = Column(Float, nullable=False)
-    transaction_type = Column(String, nullable=False)  # REFERRAL_BONUS_REFERRER, REFERRAL_BONUS_NEW_VENDOR, EARNING, WITHDRAWAL
+    transaction_type = Column(String, nullable=False)  # REFERRAL_BONUS_REFERRER, REFERRAL_BONUS_NEW_VENDOR, USER_REFERRAL_BONUS_REFERRER, USER_REFERRAL_BONUS_NEW_USER, EARNING, WITHDRAWAL
     description = Column(String, nullable=True)
     status = Column(String, default="COMPLETED", nullable=False)
     reference_id = Column(String, unique=True, index=True, nullable=True)
@@ -44,5 +45,6 @@ class WalletTransaction(Base):
     wallet = relationship("Wallet", back_populates="transactions")
     vendor = relationship("Vendor", backref="wallet_transactions")
     referral = relationship("VendorReferral", backref="wallet_transactions")
+    user_referral = relationship("UserReferral", backref="wallet_transactions")
 
 

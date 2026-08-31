@@ -17,6 +17,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    referral_code: Optional[str] = None
     profile_pic: Optional[str] = None
     new_fcm_token: Optional[str] = None
     device_id: Optional[str] = None
@@ -45,6 +46,7 @@ class OTPVerify(BaseModel):
     email: Optional[str] = None
     mobile: Optional[str] = None
     otp: Optional[str] = None
+    referral_code: Optional[str] = None
 
 
 class OTPResend(BaseModel):
@@ -82,6 +84,7 @@ class UserOut(BaseModel):
     status: UserStatus
     is_verified: bool
     is_superuser: bool
+    referral_code: Optional[str] = None
     profile_pic: Optional[str] = None
     old_fcm_token: Optional[str] = None
     new_fcm_token: Optional[str] = None
@@ -93,3 +96,35 @@ class UserOut(BaseModel):
     last_login_ip: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class UserReferralValidateRequest(BaseModel):
+    referral_code: str
+
+
+class UserReferralValidateResponse(BaseModel):
+    valid: bool
+    message: str
+    referral_type: Optional[str] = None
+    referrer_name: Optional[str] = None
+
+
+class UserReferralItem(BaseModel):
+    id: int
+    referred_user_name: str
+    status: str
+    created_at: datetime
+    qualification_date: Optional[datetime] = None
+    reward_amount: float
+
+
+class UserReferralStatsResponse(BaseModel):
+    referral_code: str
+    referral_link: str
+    total_referrals: int
+    registered_count: int
+    successful_count: int
+    pending_count: int
+    total_rewards: float
+    referrals: list[UserReferralItem] = []
+
