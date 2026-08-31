@@ -721,10 +721,8 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
         logger.debug(f"Setting category_id: {update.category_id}")
         vendor.category_id = update.category_id
 
-        db.query(VendorSubcategoryCharge).filter(
-            VendorSubcategoryCharge.vendor_id == vendor_id,
-            VendorSubcategoryCharge.category_id == update.category_id
-        ).delete()
+        validated_charges = []
+        categories_to_clear = {update.category_id}
 
         for charge in update.subcategory_charges:
             logger.debug(f"Processing subcategory charge: {charge}")
@@ -735,19 +733,25 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
             if not subcategory:
                 logger.error(f"Subcategory {charge.subcategory_id} not found")
                 raise HTTPException(status_code=404, detail="One of the selected services is invalid or no longer exists.")
-            if subcategory.category_id != update.category_id:
-                logger.error(f"Subcategory {charge.subcategory_id} does not belong to category {update.category_id}")
-                raise HTTPException(status_code=400, detail="The selected service does not belong to the chosen category.")
             if subcategory.status not in [SubCategoryStatus.active, SubCategoryStatus.inactive]:
                 logger.error(f"Invalid status for subcategory {charge.subcategory_id}: {subcategory.status}")
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid status for subcategory {charge.subcategory_id}: {subcategory.status}"
                 )
+            target_cat_id = subcategory.category_id if subcategory.category_id else update.category_id
+            categories_to_clear.add(target_cat_id)
+            validated_charges.append((charge, target_cat_id))
 
+        db.query(VendorSubcategoryCharge).filter(
+            VendorSubcategoryCharge.vendor_id == vendor_id,
+            VendorSubcategoryCharge.category_id.in_(categories_to_clear)
+        ).delete(synchronize_session=False)
+
+        for charge, cat_id in validated_charges:
             new_charge = VendorSubcategoryCharge(
                 subcategory_id=charge.subcategory_id,
-                category_id=update.category_id,
+                category_id=cat_id,
                 service_charge=charge.service_charge,
             )
             vendor.subcategory_charges.append(new_charge)

@@ -236,6 +236,8 @@ def update_bank(
 
 
 @router.put("/update-work", response_model=VendorResponse)
+@router.patch("/update-work", response_model=VendorResponse)
+@router.post("/update-work", response_model=VendorResponse)
 def update_work(
     update: WorkDetailsUpdate,
     current_vendor: Vendor = Depends(get_current_vendor),
