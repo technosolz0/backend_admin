@@ -311,6 +311,14 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         db.commit()
         db.refresh(db_vendor)
         
+        # Process input referral code if provided
+        if vendor.referral_code:
+            try:
+                from app.services.referral_service import process_vendor_referral_registration
+                process_vendor_referral_registration(db, db_vendor, vendor.referral_code)
+            except Exception as ref_err:
+                logger.error(f"Error processing referral code '{vendor.referral_code}' for vendor {db_vendor.id}: {str(ref_err)}")
+        
         try:
             send_email(vendor.email, otp, template="otp")
             logger.info(f"OTP sent to new vendor: {vendor.email}")

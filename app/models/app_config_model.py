@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
 from datetime import datetime
 from app.database import Base
 
@@ -13,5 +13,8 @@ class AppConfig(Base):
     play_store_url = Column(String, nullable=True)
     app_store_url = Column(String, nullable=True)
     update_message = Column(String, default="A new version of Serwex is available. Please update to continue.", nullable=True)
+    referrer_reward_amount = Column(Float, default=100.0, nullable=False)
+    referred_vendor_reward_amount = Column(Float, default=50.0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

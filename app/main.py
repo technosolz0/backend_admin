@@ -33,6 +33,7 @@ from app.models import (
     report_model,
     review_model,
     wallet_model,
+    vendor_referral_model,
     app_config_model
 )
 
@@ -163,6 +164,10 @@ app.include_router(notification_routes.router, prefix="/api/notifications", tags
 app.include_router(feedback_routes.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(report_routes.router, prefix="/api", tags=["reports"])
 app.include_router(review_routes.router, prefix="/api", tags=["reviews"])
+from app.api.routes import vendor_referral_api
+
+app.include_router(vendor_referral_api.router, prefix="/api")
+app.include_router(vendor_referral_api.wallet_router, prefix="/api")
 app.include_router(referral_routes.router, prefix="/api")
 app.include_router(referral_stats_routes.router, prefix="/api")
 

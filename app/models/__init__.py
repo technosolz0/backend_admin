@@ -19,7 +19,8 @@ from .withdrawal_model import Withdrawal, WithdrawalStatus
 from .vendor_earnings_model import VendorEarnings
 from .cancel_reason_model import CancelReason
 from .delete_request_model import DeleteRequest
-from .wallet_model import Wallet
+from .wallet_model import Wallet, WalletTransaction
+from .vendor_referral_model import VendorReferral, ReferralStatus
 
 from sqlalchemy.orm import configure_mappers
 configure_mappers()
