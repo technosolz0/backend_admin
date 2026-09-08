@@ -9,6 +9,7 @@ from app.models.service_provider_model import ServiceProvider
 from app.models.category import Category
 from app.models.sub_category import SubCategory
 from app.core.security import get_current_user
+from app.core.redis import get_cache, set_cache
 
 router = APIRouter(prefix="/admin/dashboard", tags=["Admin Dashboard"])
 
@@ -30,7 +31,12 @@ def get_super_admin(current_user: User = Depends(get_current_user)):
     return current_user
 
 @router.get("/", dependencies=[Depends(get_super_admin)])
-def get_admin_dashboard_stats(db: Session = Depends(get_db)):
+async def get_admin_dashboard_stats(db: Session = Depends(get_db)):
+    cache_key = "admin:dashboard:stats"
+    cached_stats = await get_cache(cache_key)
+    if cached_stats is not None:
+        return cached_stats
+
     now = datetime.utcnow()
     
     # 1. Total Counts
@@ -116,7 +122,7 @@ def get_admin_dashboard_stats(db: Session = Depends(get_db)):
             "status": b.status.value if hasattr(b.status, 'value') else str(b.status)
         })
 
-    return {
+    result = {
         "summary": {
             "total_users": total_users,
             "total_vendors": total_vendors,
@@ -129,3 +135,7 @@ def get_admin_dashboard_stats(db: Session = Depends(get_db)):
         "category_wise": category_wise,
         "subcategory_wise": subcategory_wise
     }
+
+    await set_cache(cache_key, result, ttl_seconds=120)  # Cache for 2 mins
+    return result
+

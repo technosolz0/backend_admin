@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.schemas.category_schema import CategoryOut, CategoryStatus
 from app.core.security import get_db
 from app.models.category import Category
 from app.utils.image_utils import compress_image
+from app.core.redis import get_cache, set_cache, delete_cache_pattern
 import os
 from uuid import uuid4
 
@@ -13,7 +15,7 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 # POST: Create New Category with compressed image
 # -------------------------------------------------------------------
 @router.post("/", response_model=CategoryOut, status_code=status.HTTP_201_CREATED)
-def create_new_category(
+async def create_new_category(
     name: str = Form(...),
     status: CategoryStatus = Form(default=CategoryStatus.active),
     image: UploadFile = File(...),
@@ -36,30 +38,49 @@ def create_new_category(
     db.add(new_category)
     db.commit()
     db.refresh(new_category)
+
+    # Invalidate category cache
+    await delete_cache_pattern("categories:*")
     return new_category
 
 # -------------------------------------------------------------------
 # GET: List all categories
 # -------------------------------------------------------------------
 @router.get("/", response_model=list[CategoryOut])
-def list_all_categories(db: Session = Depends(get_db)):
-    return db.query(Category).all()
+async def list_all_categories(db: Session = Depends(get_db)):
+    cache_key = "categories:all"
+    cached_categories = await get_cache(cache_key)
+    if cached_categories is not None:
+        return cached_categories
+
+    categories = db.query(Category).all()
+    categories_json = jsonable_encoder(categories)
+    await set_cache(cache_key, categories_json, ttl_seconds=1800)  # 30 mins
+    return categories
 
 # -------------------------------------------------------------------
 # GET: Get category by ID
 # -------------------------------------------------------------------
 @router.get("/{category_id}", response_model=CategoryOut)
-def get_category(category_id: int, db: Session = Depends(get_db)):
+async def get_category(category_id: int, db: Session = Depends(get_db)):
+    cache_key = f"categories:id:{category_id}"
+    cached_category = await get_cache(cache_key)
+    if cached_category is not None:
+        return cached_category
+
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
+
+    category_json = jsonable_encoder(category)
+    await set_cache(cache_key, category_json, ttl_seconds=1800)
     return category
 
 # -------------------------------------------------------------------
 # PUT: Full update (replace image optional, compressed)
 # -------------------------------------------------------------------
 @router.put("/{category_id}", response_model=CategoryOut)
-def update_category(
+async def update_category(
     category_id: int,
     name: str = Form(...),
     status: CategoryStatus = Form(default=CategoryStatus.active),
@@ -85,13 +106,15 @@ def update_category(
     category.status = status
     db.commit()
     db.refresh(category)
+
+    await delete_cache_pattern("categories:*")
     return category
 
 # -------------------------------------------------------------------
 # PATCH: Partial update (replace image optional, compressed)
 # -------------------------------------------------------------------
 @router.patch("/{category_id}", response_model=CategoryOut)
-def partial_update_category(
+async def partial_update_category(
     category_id: int,
     name: str = Form(None),
     status: CategoryStatus = Form(None),
@@ -119,24 +142,28 @@ def partial_update_category(
 
     db.commit()
     db.refresh(category)
+
+    await delete_cache_pattern("categories:*")
     return category
 
 # -------------------------------------------------------------------
 # DELETE: Remove category
 # -------------------------------------------------------------------
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+async def delete_category(category_id: int, db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     db.delete(category)
     db.commit()
 
+    await delete_cache_pattern("categories:*")
+
 # -------------------------------------------------------------------
 # POST: Toggle category status
 # -------------------------------------------------------------------
 @router.post("/{category_id}/toggle-status", response_model=CategoryOut)
-def toggle_category_status(category_id: int, db: Session = Depends(get_db)):
+async def toggle_category_status(category_id: int, db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -146,4 +173,7 @@ def toggle_category_status(category_id: int, db: Session = Depends(get_db)):
     )
     db.commit()
     db.refresh(category)
+
+    await delete_cache_pattern("categories:*")
     return category
+

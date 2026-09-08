@@ -79,13 +79,15 @@ app = FastAPI(strict_slashes=False)
 # Mount static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+from app.core.redis import init_redis, close_redis, is_redis_connected
+
 # -------------------------
-# Database auto-update on startup
+# Database auto-update & Redis initialization on startup
 # -------------------------
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     """
-    Auto-create tables and add missing columns in PostgreSQL safely.
+    Auto-create tables, add missing columns in PostgreSQL safely, and initialize Redis.
     """
     try:
         # Create all tables
@@ -115,6 +117,17 @@ def on_startup():
                             logger.warning(f"Could not auto-add column {table_name}.{column.name}: {col_err}")
     except Exception as e:
         logger.warning(f"Auto-column check on startup skipped: {e}")
+
+    await init_redis()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """
+    Close Redis connection pool on application shutdown.
+    """
+    await close_redis()
+
 
 
 # -------------------------
@@ -213,5 +226,11 @@ app.openapi = custom_openapi
 # Root endpoint
 # -------------------------
 @app.get("/")
-def root():
-    return {"message": "Serwex API is running ✅"}
+async def root():
+    redis_active = await is_redis_connected()
+    redis_status = "✅ Redis connected successfully" if redis_active else "❌ Redis connection failed"
+    return {
+        "message": "Serwex API is running ✅",
+        "redis_status": redis_status
+    }
+

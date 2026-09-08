@@ -75,3 +75,5 @@ urllib3==2.6.3
 uvicorn==0.40.0
 websockets==15.0.1
 yarl==1.22.0
+redis>=5.0.0
+
