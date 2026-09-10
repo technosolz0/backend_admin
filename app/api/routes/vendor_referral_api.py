@@ -119,7 +119,7 @@ def get_vendor_referral_dashboard(
         ))
 
     domain = "https://serwex.in"
-    referral_code = current_vendor.referral_code or f"SERWEX-{current_vendor.id}"
+    referral_code = current_vendor.referral_code or f"SERWEXV{current_vendor.id}"
     referral_link = f"{domain}/partner/register?ref={referral_code}"
 
     return ReferralDashboardOut(

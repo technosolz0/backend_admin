@@ -12,8 +12,10 @@ import logging
 from app.core.security import get_db, get_current_vendor
 from app.models.booking_model import Booking, BookingStatus
 from app.models.payment_model import Payment, PaymentStatus
+from app.models.vendor_earnings_model import VendorEarnings
 from app.models.user import User
 from app.crud import withdrawal_crud
+from app.services.commission_service import get_vendor_current_commission_tier_status
 
 logger = logging.getLogger(__name__)
 
@@ -127,24 +129,47 @@ def get_vendor_dashboard(
             failed_payments = 0
 
         # ==================== TODAY'S EARNINGS ====================
+        # ==================== TODAY'S EARNINGS & DYNAMIC COMMISSION ====================
         try:
-            today_revenue = db.query(func.sum(Payment.amount)).join(
-                Booking, Payment.booking_id == Booking.id
+            today_earnings_row = db.query(
+                func.sum(VendorEarnings.total_paid).label("gross"),
+                func.sum(VendorEarnings.commission_amount).label("commission"),
+                func.sum(VendorEarnings.final_amount).label("net")
             ).filter(
                 and_(
-                    Booking.serviceprovider_id == vendor_id,
-                    Payment.status == PaymentStatus.SUCCESS,
-                    func.date(Payment.created_at) == today
+                    VendorEarnings.vendor_id == vendor_id,
+                    func.date(VendorEarnings.earned_at) == today
                 )
-            ).scalar() or 0
+            ).first()
 
-            today_commission = float(today_revenue) * COMMISSION_RATE
-            today_net_earnings = float(today_revenue) - today_commission
+            if today_earnings_row and today_earnings_row.gross is not None:
+                today_revenue = float(today_earnings_row.gross or 0)
+                today_commission = float(today_earnings_row.commission or 0)
+                today_net_earnings = float(today_earnings_row.net or 0)
+            else:
+                today_revenue = db.query(func.sum(Payment.amount)).join(
+                    Booking, Payment.booking_id == Booking.id
+                ).filter(
+                    and_(
+                        Booking.serviceprovider_id == vendor_id,
+                        Payment.status == PaymentStatus.SUCCESS,
+                        func.date(Payment.created_at) == today
+                    )
+                ).scalar() or 0
+                today_commission = float(today_revenue) * COMMISSION_RATE
+                today_net_earnings = float(today_revenue) - today_commission
         except Exception as e:
             logger.error(f"Error fetching today's earnings: {e}")
             today_revenue = 0.0
             today_commission = 0.0
             today_net_earnings = 0.0
+
+        # Dynamic Commission Tier Status
+        try:
+            commission_tier_status = get_vendor_current_commission_tier_status(db, vendor_id, target_date=today)
+        except Exception as e:
+            logger.error(f"Error fetching commission tier status: {e}")
+            commission_tier_status = None
 
         # ==================== RECENT BOOKINGS ====================
         recent_bookings = []
@@ -263,6 +288,7 @@ def get_vendor_dashboard(
                 "total_commission_annual": sum(m["commission"] for m in monthly_data),
                 "total_net_annual": sum(m["net_revenue"] for m in monthly_data),
             },
+            "commission_tier": commission_tier_status,
             "metadata": {
                 "vendor_id": vendor_id,
                 "generated_at": datetime.now().isoformat(),

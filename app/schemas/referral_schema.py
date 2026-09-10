@@ -3,13 +3,12 @@ from datetime import datetime
 from typing import Optional
 
 class AdminReferralCodeBase(BaseModel):
-    code: str
     name: str
     no_of_bookings: int = 10
     commission_percentage: float = 0.0
 
 class AdminReferralCodeCreate(AdminReferralCodeBase):
-    pass
+    code: Optional[str] = None  # If not provided, a unique alphanumeric code is auto-generated without special characters
 
 class AdminReferralCodeUpdate(BaseModel):
     code: Optional[str] = None
@@ -19,6 +18,7 @@ class AdminReferralCodeUpdate(BaseModel):
 
 class AdminReferralCodeOut(AdminReferralCodeBase):
     id: int
+    code: str
     created_at: datetime
     updated_at: datetime
 

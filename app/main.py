@@ -68,6 +68,7 @@ from app.api.routes import (
     vendor_notification_routes,
     app_config_routes,
     user_referral_routes,
+    commission_routes,
 )
 
 
@@ -197,6 +198,7 @@ app.include_router(admin_payments.router, prefix="/api", tags=["Admin Payments"]
 app.include_router(vendor_notification_routes.router, prefix="/api", tags=["Vendor Notifications"])
 app.include_router(app_config_routes.router, prefix="/api")
 app.include_router(user_referral_routes.router, prefix="/api")
+app.include_router(commission_routes.router, prefix="/api")
 
 # -------------------------
 # Custom OpenAPI with JWT

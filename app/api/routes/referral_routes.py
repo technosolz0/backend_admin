@@ -12,11 +12,12 @@ from app.crud.referral_crud import (
 router = APIRouter(prefix="/admin/referrals", tags=["admin-referrals"])
 
 @router.post("/", response_model=AdminReferralCodeOut)
+@router.post("/campaign", response_model=AdminReferralCodeOut)
 def create_referral(referral: AdminReferralCodeCreate, db: Session = Depends(get_db)):
-    existing = get_admin_referral_code_by_code(db, referral.code)
-    if existing:
-        raise HTTPException(status_code=400, detail="Referral code already exists")
-    return create_admin_referral_code(db, referral)
+    try:
+        return create_admin_referral_code(db, referral)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[AdminReferralCodeOut])
 def list_referrals(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -31,10 +32,13 @@ def get_referral(referral_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{referral_id}", response_model=AdminReferralCodeOut)
 def update_referral(referral_id: int, referral_update: AdminReferralCodeUpdate, db: Session = Depends(get_db)):
-    db_referral = update_admin_referral_code(db, referral_id, referral_update)
-    if not db_referral:
-        raise HTTPException(status_code=404, detail="Referral code not found")
-    return db_referral
+    try:
+        db_referral = update_admin_referral_code(db, referral_id, referral_update)
+        if not db_referral:
+            raise HTTPException(status_code=404, detail="Referral code not found")
+        return db_referral
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{referral_id}")
 def delete_referral(referral_id: int, db: Session = Depends(get_db)):

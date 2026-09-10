@@ -15,7 +15,7 @@ class VendorReferral(Base):
     __tablename__ = "vendor_referrals"
 
     id = Column(Integer, primary_key=True, index=True)
-    referrer_vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False, index=True)
+    referrer_vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True, index=True)
     referred_vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False, unique=True, index=True)
     referral_code = Column(String, nullable=False)
     status = Column(SAEnum(ReferralStatus), default=ReferralStatus.REGISTERED, nullable=False)

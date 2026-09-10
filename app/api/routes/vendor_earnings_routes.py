@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from app.core.security import get_db
+from typing import List, Dict, Any
+from app.core.security import get_db, get_current_vendor
+from app.models.vendor_model import Vendor
 from app.schemas.vendor_earnings_schema import VendorEarningsCreate, VendorEarningsOut
 from app.crud import vendor_earnings_crud
+from app.services.commission_service import get_vendor_current_commission_tier_status
 
 router = APIRouter(prefix="/vendor-earnings", tags=["Vendor Earnings"])
 
@@ -18,6 +20,19 @@ def create_vendor_earnings(earnings: VendorEarningsCreate, db: Session = Depends
         commission_amount=earnings.commission_amount,
         final_amount=earnings.final_amount
     )
+
+@router.get("/tier-status/{vendor_id}")
+def get_vendor_tier_status(vendor_id: int, db: Session = Depends(get_db)):
+    """Get the current dynamic daily commission tier status for a specific vendor."""
+    return get_vendor_current_commission_tier_status(db, vendor_id)
+
+@router.get("/my-tier-status")
+def get_my_tier_status(
+    db: Session = Depends(get_db),
+    current_vendor: Vendor = Depends(get_current_vendor)
+):
+    """Get the logged-in vendor's dynamic daily commission tier status and progress."""
+    return get_vendor_current_commission_tier_status(db, current_vendor.id)
 
 @router.get("/vendor/{vendor_id}", response_model=List[VendorEarningsOut])
 def get_vendor_earnings_by_vendor(vendor_id: int, db: Session = Depends(get_db)):

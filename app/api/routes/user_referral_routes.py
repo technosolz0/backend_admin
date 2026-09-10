@@ -6,12 +6,13 @@ from app.core.security import get_db, get_current_user
 from app.models.user import User
 from app.models.vendor_model import Vendor
 from app.models.user_referral_model import UserReferral, ReferralStatus
+from app.models.referral_model import AdminReferralCode
 from app.schemas.user_schema import (
     UserReferralStatsResponse, UserReferralItem,
     UserReferralValidateRequest, UserReferralValidateResponse
 )
 from app.services.referral_service import (
-    generate_unique_user_referral_code, get_user_referral_reward_configs
+    generate_unique_user_referral_code, get_user_referral_reward_configs, clean_referral_code
 )
 
 logger = logging.getLogger(__name__)
@@ -91,10 +92,14 @@ def validate_user_referral_code(
             message="Referral code cannot be empty"
         )
 
-    code_clean = payload.referral_code.strip().upper()
+    code_raw = payload.referral_code.strip().upper()
+    code_clean = clean_referral_code(payload.referral_code)
 
     # 1. Cross-type check: Reject Vendor referral codes
-    vendor = db.query(Vendor).filter(func.upper(Vendor.referral_code) == code_clean).first()
+    vendor = db.query(Vendor).filter(
+        (func.upper(Vendor.referral_code) == code_raw) |
+        (func.upper(Vendor.referral_code) == code_clean)
+    ).first()
     if vendor:
         return UserReferralValidateResponse(
             valid=False,
@@ -103,16 +108,32 @@ def validate_user_referral_code(
         )
 
     # 2. Look up User referral code
-    referrer = db.query(User).filter(func.upper(User.referral_code) == code_clean).first()
-    if not referrer:
+    referrer = db.query(User).filter(
+        (func.upper(User.referral_code) == code_raw) |
+        (func.upper(User.referral_code) == code_clean)
+    ).first()
+    if referrer:
         return UserReferralValidateResponse(
-            valid=False,
-            message="Invalid referral code. Please check and try again."
+            valid=True,
+            message="Valid referral code!",
+            referral_type="user",
+            referrer_name=referrer.name
+        )
+
+    # 3. Look up Admin Campaign referral code
+    admin_referral = db.query(AdminReferralCode).filter(
+        (func.upper(AdminReferralCode.code) == code_raw) |
+        (func.upper(AdminReferralCode.code) == code_clean)
+    ).first()
+    if admin_referral:
+        return UserReferralValidateResponse(
+            valid=True,
+            message=f"Valid campaign code: {admin_referral.name}!",
+            referral_type="campaign",
+            referrer_name=admin_referral.name
         )
 
     return UserReferralValidateResponse(
-        valid=True,
-        message="Valid referral code!",
-        referral_type="user",
-        referrer_name=referrer.name
+        valid=False,
+        message="Invalid referral code. Please check and try again."
     )
