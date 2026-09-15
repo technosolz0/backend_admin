@@ -46,13 +46,17 @@ def get_referral_reward_configs(db: Session) -> tuple[float, float]:
     """Get dynamic vendor referral reward configuration (random range or fixed amount set by admin)."""
     config = db.query(AppConfig).first()
     is_random = getattr(config, 'is_random_referral_reward', False) if config else False
+    if is_random is None:
+        is_random = False
 
     if is_random:
         referrer_amount = generate_random_reward_amount(db)
         referred_amount = generate_random_reward_amount(db)
     else:
-        referrer_amount = float(getattr(config, 'referrer_reward_amount', 100.0))
-        referred_amount = float(getattr(config, 'referred_vendor_reward_amount', 50.0))
+        ref_val = getattr(config, 'referrer_reward_amount', None) if config else None
+        referrer_amount = float(ref_val) if ref_val is not None else 100.0
+        ref_v_val = getattr(config, 'referred_vendor_reward_amount', None) if config else None
+        referred_amount = float(ref_v_val) if ref_v_val is not None else 50.0
 
     return referrer_amount, referred_amount
 
@@ -60,13 +64,17 @@ def get_user_referral_reward_configs(db: Session) -> tuple[float, float]:
     """Get dynamic user referral reward configuration (random range or fixed amount set by admin)."""
     config = db.query(AppConfig).first()
     is_random = getattr(config, 'is_random_referral_reward', False) if config else False
+    if is_random is None:
+        is_random = False
 
     if is_random:
         referrer_amount = generate_random_reward_amount(db)
         referred_amount = generate_random_reward_amount(db)
     else:
-        referrer_amount = float(getattr(config, 'user_referrer_reward_amount', 50.0))
-        referred_amount = float(getattr(config, 'user_referred_reward_amount', 50.0))
+        ref_val = getattr(config, 'user_referrer_reward_amount', None) if config else None
+        referrer_amount = float(ref_val) if ref_val is not None else 50.0
+        ref_v_val = getattr(config, 'user_referred_reward_amount', None) if config else None
+        referred_amount = float(ref_v_val) if ref_v_val is not None else 50.0
 
     return referrer_amount, referred_amount
 

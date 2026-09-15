@@ -126,11 +126,13 @@ def list_vendor_referrals(
 def get_referral_reward_config(db: Session = Depends(get_db)):
     """Get configured referral reward amounts."""
     config = db.query(AppConfig).first()
-    referrer_amount = getattr(config, 'referrer_reward_amount', 100.0) if config else 100.0
-    referred_amount = getattr(config, 'referred_vendor_reward_amount', 50.0) if config else 50.0
+    ref_val = getattr(config, 'referrer_reward_amount', None) if config else None
+    referrer_amount = float(ref_val) if ref_val is not None else 100.0
+    ref_v_val = getattr(config, 'referred_vendor_reward_amount', None) if config else None
+    referred_amount = float(ref_v_val) if ref_v_val is not None else 50.0
     return {
-        "referrer_reward_amount": float(referrer_amount),
-        "referred_vendor_reward_amount": float(referred_amount)
+        "referrer_reward_amount": referrer_amount,
+        "referred_vendor_reward_amount": referred_amount
     }
 
 
