@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from datetime import datetime
 
 class SubCategoryStatus(str, Enum):
     active = "active"
@@ -30,6 +31,8 @@ class SubCategoryOut(BaseModel):
     image: Optional[str]
     service_charge: float
     category_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

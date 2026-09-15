@@ -64,6 +64,7 @@ class BookingOut(BaseModel):
     # Timing/Secret
     otp: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
     tracking_started_at: Optional[datetime] = None
     vendor_arrived_at: Optional[datetime] = None
     tracking_ended_at: Optional[datetime] = None

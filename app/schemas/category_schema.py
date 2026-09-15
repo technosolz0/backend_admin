@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from datetime import datetime
 
 class CategoryStatus(str, Enum):
     active = "Active"
@@ -26,6 +27,8 @@ class CategoryOut(BaseModel):
     name: str
     status: CategoryStatus
     image: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

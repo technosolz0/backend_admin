@@ -14,6 +14,7 @@ from app.models.user_referral_model import UserReferral
 from app.models.booking_model import Booking, BookingStatus
 from app.models.wallet_model import Wallet, WalletTransaction
 from app.models.app_config_model import AppConfig
+from app.models.referral_config_model import ReferralConfig
 from app.utils.fcm import send_notification, NotificationType
 
 logger = logging.getLogger(__name__)
@@ -27,10 +28,19 @@ def clean_referral_code(code: str) -> str:
         return ""
     return re.sub(r'[^A-Za-z0-9]', '', code).upper()
 
+def get_db_referral_config(db: Session):
+    """Helper to fetch ReferralConfig record, falling back to AppConfig if ReferralConfig is missing."""
+    if not db:
+        return None
+    ref_cfg = db.query(ReferralConfig).first()
+    if ref_cfg:
+        return ref_cfg
+    return db.query(AppConfig).first()
+
 def generate_random_reward_amount(db: Session = None, min_val: int = MIN_REFERRAL_REWARD, max_val: int = MAX_REFERRAL_REWARD) -> float:
-    """Generate a random reward amount between min_val and max_val (inclusive), dynamically using AppConfig DB range if available."""
+    """Generate a random reward amount between min_val and max_val (inclusive), dynamically using ReferralConfig DB range if available."""
     if db:
-        config = db.query(AppConfig).first()
+        config = get_db_referral_config(db)
         if config:
             if getattr(config, 'min_referral_reward', None) is not None:
                 min_val = int(config.min_referral_reward)
@@ -44,7 +54,7 @@ def generate_random_reward_amount(db: Session = None, min_val: int = MIN_REFERRA
 
 def get_referral_reward_configs(db: Session) -> tuple[float, float]:
     """Get dynamic vendor referral reward configuration (random range or fixed amount set by admin)."""
-    config = db.query(AppConfig).first()
+    config = get_db_referral_config(db)
     is_random = getattr(config, 'is_random_referral_reward', False) if config else False
     if is_random is None:
         is_random = False
@@ -62,7 +72,7 @@ def get_referral_reward_configs(db: Session) -> tuple[float, float]:
 
 def get_user_referral_reward_configs(db: Session) -> tuple[float, float]:
     """Get dynamic user referral reward configuration (random range or fixed amount set by admin)."""
-    config = db.query(AppConfig).first()
+    config = get_db_referral_config(db)
     is_random = getattr(config, 'is_random_referral_reward', False) if config else False
     if is_random is None:
         is_random = False

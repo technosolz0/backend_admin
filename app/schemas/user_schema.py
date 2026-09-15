@@ -94,6 +94,8 @@ class UserOut(BaseModel):
     app_version: Optional[str] = None
     last_login_at: Optional[datetime] = None
     last_login_ip: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

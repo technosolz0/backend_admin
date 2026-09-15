@@ -36,6 +36,7 @@ class Booking(Base):
     latest_vendor_location_updated_at = Column(DateTime, nullable=True)
     status = Column(Enum(BookingStatus), default=BookingStatus.pending)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     otp = Column(String, nullable=True)
     otp_created_at = Column(DateTime, nullable=True)
 

@@ -138,6 +138,8 @@ class VendorResponse(BaseModel):
     referral_code: Optional[str] = None
     referred_by: Optional[ReferralInfo] = None
     referrals_made: List[ReferralInfo] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

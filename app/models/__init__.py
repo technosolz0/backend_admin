@@ -22,6 +22,7 @@ from .delete_request_model import DeleteRequest
 from .wallet_model import Wallet, WalletTransaction
 from .vendor_referral_model import VendorReferral, ReferralStatus
 from .user_referral_model import UserReferral
+from .referral_config_model import ReferralConfig
 
 from sqlalchemy.orm import configure_mappers
 configure_mappers()

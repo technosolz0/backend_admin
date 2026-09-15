@@ -34,6 +34,8 @@ class User(Base):
     app_version = Column(String, nullable=True)  # e.g., 1.0.0
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     referral_code = Column(String, unique=True, index=True, nullable=True)
     referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     applied_referral_code = Column(String, nullable=True)

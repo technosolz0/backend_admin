@@ -1,5 +1,5 @@
-from app.database import Base, engine
-from app.models import category  # make sure your category model is imported
+from alter_db_tables import alter_database_tables
 
-Base.metadata.create_all(bind=engine)
-print("Tables created successfully.")
+if __name__ == "__main__":
+    alter_database_tables()
+

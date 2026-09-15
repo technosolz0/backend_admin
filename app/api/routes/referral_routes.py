@@ -122,47 +122,23 @@ def list_vendor_referrals(
     }
 
 
+from app.schemas.referral_config_schema import ReferralConfigOut, ReferralConfigUpdate
+from app.crud.referral_config_crud import get_referral_config, update_referral_config
+
+@router.get("/config", response_model=ReferralConfigOut)
 @router.get("/reward-config")
-def get_referral_reward_config(db: Session = Depends(get_db)):
-    """Get configured referral reward amounts."""
-    config = db.query(AppConfig).first()
-    ref_val = getattr(config, 'referrer_reward_amount', None) if config else None
-    referrer_amount = float(ref_val) if ref_val is not None else 100.0
-    ref_v_val = getattr(config, 'referred_vendor_reward_amount', None) if config else None
-    referred_amount = float(ref_v_val) if ref_v_val is not None else 50.0
-    return {
-        "referrer_reward_amount": referrer_amount,
-        "referred_vendor_reward_amount": referred_amount
-    }
+def get_referral_reward_config_endpoint(db: Session = Depends(get_db)):
+    """Get full configured referral reward settings from ReferralConfig table."""
+    return get_referral_config(db)
 
-
+@router.put("/config", response_model=ReferralConfigOut)
 @router.put("/reward-config")
-def update_referral_reward_config(
-    payload: RewardConfigUpdate,
+def update_referral_reward_config_endpoint(
+    payload: ReferralConfigUpdate,
     db: Session = Depends(get_db)
 ):
-    """Update referral reward amounts (Admin)."""
-    if payload.referrer_reward_amount < 0 or payload.referred_vendor_reward_amount < 0:
-        raise HTTPException(status_code=400, detail="Reward amounts cannot be negative")
-
-    config = db.query(AppConfig).first()
-    if not config:
-        config = AppConfig(
-            referrer_reward_amount=payload.referrer_reward_amount,
-            referred_vendor_reward_amount=payload.referred_vendor_reward_amount
-        )
-        db.add(config)
-    else:
-        config.referrer_reward_amount = payload.referrer_reward_amount
-        config.referred_vendor_reward_amount = payload.referred_vendor_reward_amount
-
-    db.commit()
-    return {
-        "success": True,
-        "message": "Referral reward configuration updated successfully",
-        "referrer_reward_amount": payload.referrer_reward_amount,
-        "referred_vendor_reward_amount": payload.referred_vendor_reward_amount
-    }
+    """Update full referral reward settings in ReferralConfig table."""
+    return update_referral_config(db, payload)
 
 
 @router.put("/vendor/{referral_id}/cancel")

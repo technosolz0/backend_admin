@@ -204,6 +204,8 @@ def build_vendor_response(db: Session, vendor: Vendor) -> VendorResponse:
         referral_code=vendor.referral_code,
         referred_by=referred_by,
         referrals_made=referrals_made,
+        created_at=vendor.created_at,
+        updated_at=vendor.updated_at,
         bank_name=next(
             (ba.bank_name for ba in bank_accounts if ba.is_primary and ba.bank_name),
             None
