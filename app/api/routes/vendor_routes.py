@@ -251,7 +251,7 @@ def update_work(
 def update_documents(
     profile_pic: UploadFile = File(None),
     identity_doc: UploadFile = File(...),
-    bank_doc: UploadFile = File(...),
+    bank_doc: UploadFile = File(None),
     address_doc: UploadFile = File(...),
     current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db)

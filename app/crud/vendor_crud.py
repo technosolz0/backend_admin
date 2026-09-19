@@ -224,8 +224,9 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
     try:
         existing = get_vendor_by_email(db, email=vendor.email)
         
-        if existing and existing.otp_verified:
-            logger.warning(f"Vendor registration attempt with existing verified email: {vendor.email}")
+        # Only consider vendor as registered if they verified OTP AND completed step one (step > 1)
+        if existing and existing.otp_verified and existing.step > 1:
+            logger.warning(f"Vendor registration attempt with existing registered email: {vendor.email}")
             return {
                 "success": False,
                 "message": "This email is already registered with us. Please log in to your account.",
@@ -234,19 +235,30 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         
         existing_phone = db.query(Vendor).filter(
             Vendor.phone == vendor.phone,
-            Vendor.otp_verified == True
+            Vendor.otp_verified == True,
+            Vendor.step > 1
         ).first()
         
         if existing_phone and (not existing or existing.id != existing_phone.id):
-            logger.warning(f"Vendor registration attempt with existing verified phone: {vendor.phone}")
+            logger.warning(f"Vendor registration attempt with existing registered phone: {vendor.phone}")
             return {
                 "success": False,
                 "message": "This phone number is already registered with another account. Please use a different number.",
                 "data": None
             }
         
-        if existing and not existing.otp_verified:
-            logger.info(f"Updating existing unverified vendor: {vendor.email}")
+        # Free up phone from any uncompleted/abandoned account
+        other_uncompleted_phones = db.query(Vendor).filter(
+            Vendor.phone == vendor.phone,
+            (Vendor.otp_verified == False) | (Vendor.step <= 1)
+        ).all()
+        for other_p in other_uncompleted_phones:
+            if not existing or existing.id != other_p.id:
+                other_p.phone = f"{other_p.phone}_abandoned_{other_p.id}"
+        db.commit()
+
+        if existing and (not existing.otp_verified or existing.step <= 1):
+            logger.info(f"Updating existing uncompleted vendor: {vendor.email}")
             existing.full_name = vendor.full_name
             existing.phone = vendor.phone
             existing.password = get_password_hash(vendor.password)
@@ -259,6 +271,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
             existing.longitude = vendor.longitude
             existing.device_name = vendor.device_name
             existing.step = 0
+            existing.otp_verified = False
             existing.otp = generate_otp()
             existing.otp_created_at = datetime.utcnow()
             existing.otp_last_sent_at = datetime.utcnow()
@@ -268,7 +281,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
             
             try:
                 send_email(vendor.email, existing.otp, template="otp")
-                logger.info(f"OTP sent to existing unverified vendor: {vendor.email}")
+                logger.info(f"OTP sent to existing uncompleted vendor: {vendor.email}")
             except Exception as e:
                 logger.error(f"Failed to send OTP to {vendor.email}: {str(e)}")
             
@@ -422,7 +435,7 @@ def verify_vendor_otp(db: Session, email: Optional[str] = None, otp: Optional[st
                 "data": None
             }
         
-        if vendor.otp_verified:
+        if vendor.otp_verified and vendor.step > 1:
             logger.info(f"Vendor account already verified: email={vendor.email}, phone={vendor.phone}")
             vendor_response = build_vendor_response(db, vendor)
             return {
@@ -505,13 +518,17 @@ def resend_otp(db: Session, email: str) -> Dict[str, Any]:
                 "data": None
             }
         
-        if vendor.otp_verified:
+        if vendor.otp_verified and vendor.step > 1:
             logger.warning(f"OTP resend attempt for already verified vendor: {email}")
             return {
                 "success": False,
                 "message": "Your account is already verified! You can log in now.",
                 "data": None
             }
+        
+        # If vendor had verified OTP earlier but never completed step 1, reset otp_verified so they can re-verify with new OTP
+        if vendor.otp_verified and vendor.step <= 1:
+            vendor.otp_verified = False
         
         if vendor.otp_last_sent_at:
             time_since_last = datetime.utcnow() - vendor.otp_last_sent_at
@@ -651,7 +668,7 @@ def update_vendor_address(db: Session, vendor_id: int, update: AddressDetailsUpd
     for field, value in update.dict(exclude_unset=True).items():
         setattr(vendor, field, value)
     
-    if vendor.step == 0:
+    if vendor.step <= 1:
         vendor.step = 2
     vendor.last_device_update = datetime.utcnow()
     db.commit()
@@ -766,8 +783,8 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
             )
             vendor.subcategory_charges.append(new_charge)
 
-        if vendor.step == 2:
-            vendor.step = 4
+        if vendor.step <= 2:
+            vendor.step = 3
         vendor.status = 'approved'
         vendor.last_device_update = datetime.utcnow()
         db.commit()
@@ -789,7 +806,7 @@ def update_vendor_work(db: Session, vendor_id: int, update: WorkDetailsUpdate) -
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
-def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile | None, identity_doc: UploadFile, bank_doc: UploadFile, address_doc: UploadFile) -> VendorResponse:
+def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile | None, identity_doc: UploadFile, bank_doc: UploadFile | None, address_doc: UploadFile) -> VendorResponse:
     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not vendor:
         raise HTTPException(status_code=404, detail="We couldn't find your profile. Please check if you're logged in correctly.")
@@ -826,11 +843,12 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
             vendor.profile_pic = save_file(profile_pic, "profiles", "profile")
         
         vendor.identity_doc_url = save_file(identity_doc, "documents", "identity")
-        vendor.bank_doc_url = save_file(bank_doc, "documents", "bank")
+        if bank_doc:
+            vendor.bank_doc_url = save_file(bank_doc, "documents", "bank")
         vendor.address_doc_url = save_file(address_doc, "documents", "address")
         
-        if vendor.step == 3:
-            vendor.step = 5
+        if vendor.step <= 3:
+            vendor.step = 4
         vendor.last_device_update = datetime.utcnow()
         db.commit()
         db.refresh(vendor)
