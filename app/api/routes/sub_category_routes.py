@@ -3,30 +3,19 @@ from sqlalchemy.orm import Session
 from app.core.security import get_db
 from app.models.sub_category import SubCategory
 from app.schemas.sub_category_schema import SubCategoryOut, SubCategoryStatus
-import os, shutil
-from uuid import uuid4
+from app.core.firebase_storage import upload_to_firebase, delete_from_firebase
+import os
 
 router = APIRouter(prefix="/subcategories", tags=["subcategories"])
 
-UPLOAD_DIR = "static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
-def save_image(image: UploadFile, old_image: str = None) -> str:
-    """Save uploaded image, delete old if exists, return new path."""
-    # delete old image
+def save_image(image: UploadFile, folder_id: int = None, old_image: str = None) -> str:
+    """Save uploaded image to Firebase Storage, delete old if exists, return new URL."""
     if old_image:
-        old_path = old_image.lstrip("/")  # remove leading slash if any
-        if os.path.exists(old_path):
-            os.remove(old_path)
+        delete_from_firebase(old_image)
 
-    # save new image
-    filename = f"{uuid4().hex}_{image.filename}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-
-    return f"/{UPLOAD_DIR}/{filename}"
+    folder = f"subcategories/{folder_id}" if folder_id else "subcategories"
+    return upload_to_firebase(image, folder_path=folder)
 
 
 @router.post("/", response_model=SubCategoryOut, status_code=status.HTTP_201_CREATED)
@@ -38,7 +27,7 @@ def create_sub_category(
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    image_path = save_image(image) if image else None
+    image_path = save_image(image, folder_id=category_id) if image else None
 
     new_sub_category = SubCategory(
         name=name,
@@ -89,7 +78,7 @@ def update_sub_category(
         raise HTTPException(status_code=404, detail="Sub-category not found")
 
     if image:
-        sub_category.image = save_image(image, sub_category.image)
+        sub_category.image = save_image(image, folder_id=category_id, old_image=sub_category.image)
 
     sub_category.name = name
     sub_category.status = status
@@ -124,7 +113,8 @@ def partial_update_sub_category(
     if service_charge is not None:
         sub_category.service_charge = service_charge
     if image:
-        sub_category.image = save_image(image, sub_category.image)
+        target_cat = category_id if category_id else sub_category.category_id
+        sub_category.image = save_image(image, folder_id=target_cat, old_image=sub_category.image)
 
     db.commit()
     db.refresh(sub_category)
@@ -138,9 +128,7 @@ def delete_sub_category(sub_category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Sub-category not found")
 
     if sub_category.image:
-        old_path = sub_category.image.lstrip("/")
-        if os.path.exists(old_path):
-            os.remove(old_path)
+        delete_from_firebase(sub_category.image)
 
     db.delete(sub_category)
     db.commit()

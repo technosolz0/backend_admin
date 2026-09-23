@@ -157,6 +157,7 @@ from sqlalchemy import and_
 from typing import List, Optional
 from app.models.vendor_bank_account_model import VendorBankAccount
 from app.schemas.service_provider_schema import BankAccountCreate, BankAccountUpdate
+from app.core.firebase_storage import delete_from_firebase
 import logging
 
 logger = logging.getLogger(__name__)
@@ -272,7 +273,11 @@ def delete_bank_account(db: Session, account_id: int, vendor_id: int) -> bool:
         return False
     
     was_primary = bank_account.is_primary
-    
+
+    # Clean up bank document file from Firebase Storage if exists
+    if bank_account.bank_doc_url:
+        delete_from_firebase(bank_account.bank_doc_url)
+
     db.delete(bank_account)
     db.commit()
     

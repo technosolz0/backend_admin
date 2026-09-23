@@ -13,5 +13,7 @@ class OTPConfig:
 class Settings:
     RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID")
     RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET")
+    FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase_service_account.json")
+    FIREBASE_STORAGE_BUCKET: str = os.getenv("FIREBASE_STORAGE_BUCKET", "serwex-partner.firebasestorage.app")
 
 settings = Settings()

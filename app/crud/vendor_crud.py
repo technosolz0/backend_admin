@@ -28,6 +28,7 @@ from app.schemas.service_provider_schema import (
 from app.schemas.service_provider_schema import BankAccountOut
 from app.schemas.sub_category_schema import SubCategoryStatus
 from app.utils.fcm import send_notification, NotificationType
+from app.core.firebase_storage import upload_to_firebase, delete_from_firebase
 import logging
 from typing import List, Dict, Any, Optional
 import os
@@ -816,36 +817,40 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
     
     allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf'}
     max_file_size = 5 * 1024 * 1024
-    upload_base_dir = os.getenv("UPLOAD_DIR", "uploads")
 
-    def save_file(file: UploadFile, subdir: str, prefix: str) -> str:
+    def save_file(file: UploadFile, subdir: str, prefix: str, old_file_url: str = None) -> str:
         try:
             ext = file.filename.split(".")[-1].lower() if file.filename else ""
             if ext not in allowed_extensions:
                 logger.error(f"Invalid file type for {prefix}: {ext}")
                 raise HTTPException(status_code=400, detail=f"The {prefix} file type is not valid. Please upload one of: {', '.join(allowed_extensions)}")
-            if file.size > max_file_size:
+            
+            # Check file size if available
+            if hasattr(file, "size") and file.size and file.size > max_file_size:
                 logger.error(f"{prefix} file too large: {file.size} bytes")
                 raise HTTPException(status_code=400, detail=f"The {prefix} file is too large. The maximum size is {max_file_size // (1024*1024)}MB.")
-            
-            file_path = Path(upload_base_dir) / subdir / f"{prefix}_{vendor_id}.{ext}"
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            with file_path.open("wb") as buffer:
-                buffer.write(file.file.read())
-            logger.debug(f"Saved {prefix} file to {file_path}")
-            return str(file_path)
+
+            # Delete old file from Firebase/disk if replacing
+            if old_file_url:
+                delete_from_firebase(old_file_url)
+
+            folder = f"vendors/{vendor_id}/{subdir}"
+            custom_filename = f"{prefix}_{vendor_id}.{ext}"
+            return upload_to_firebase(file, folder_path=folder, custom_filename=custom_filename)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error saving {prefix} file: {str(e)}")
             raise HTTPException(status_code=500, detail=f"We couldn't save your {prefix} file. Please try again.")
 
     try:
         if profile_pic:
-            vendor.profile_pic = save_file(profile_pic, "profiles", "profile")
+            vendor.profile_pic = save_file(profile_pic, "profile", "profile", vendor.profile_pic)
         
-        vendor.identity_doc_url = save_file(identity_doc, "documents", "identity")
+        vendor.identity_doc_url = save_file(identity_doc, "documents/identity", "identity", vendor.identity_doc_url)
         if bank_doc:
-            vendor.bank_doc_url = save_file(bank_doc, "documents", "bank")
-        vendor.address_doc_url = save_file(address_doc, "documents", "address")
+            vendor.bank_doc_url = save_file(bank_doc, "documents/bank", "bank", vendor.bank_doc_url)
+        vendor.address_doc_url = save_file(address_doc, "documents/address", "address", vendor.address_doc_url)
         
         if vendor.step <= 3:
             vendor.step = 4

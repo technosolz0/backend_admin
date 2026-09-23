@@ -6,8 +6,8 @@ from app.core.security import get_db
 from app.models.category import Category
 from app.utils.image_utils import compress_image
 from app.core.redis import get_cache, set_cache, delete_cache_pattern
+from app.core.firebase_storage import upload_to_firebase, delete_from_firebase
 import os
-from uuid import uuid4
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -21,21 +21,23 @@ async def create_new_category(
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    filename = f"{uuid4().hex}.jpg"   # always save as JPG
-    image_path = os.path.join("static/uploads", filename)
-    os.makedirs(os.path.dirname(image_path), exist_ok=True)
-
-    # Compress before saving
-    compressed = compress_image(image, max_size=(800, 800), quality=75)
-    with open(image_path, "wb") as buffer:
-        buffer.write(compressed.read())
-
     new_category = Category(
         name=name,
         status=status,
-        image=f"/static/uploads/{filename}"
+        image=""
     )
     db.add(new_category)
+    db.flush()
+
+    # Compress before saving to Firebase Storage
+    compressed = compress_image(image, max_size=(800, 800), quality=75)
+    image_url = upload_to_firebase(
+        compressed,
+        folder_path=f"categories/{new_category.id}",
+        content_type="image/jpeg"
+    )
+    new_category.image = image_url
+
     db.commit()
     db.refresh(new_category)
 
@@ -92,15 +94,15 @@ async def update_category(
         raise HTTPException(status_code=404, detail="Category not found")
 
     if image:
-        filename = f"{uuid4().hex}.jpg"
-        image_path = os.path.join("static/uploads", filename)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
+        if category.image:
+            delete_from_firebase(category.image)
 
         compressed = compress_image(image, max_size=(800, 800), quality=75)
-        with open(image_path, "wb") as buffer:
-            buffer.write(compressed.read())
-
-        category.image = f"/static/uploads/{filename}"
+        category.image = upload_to_firebase(
+            compressed,
+            folder_path=f"categories/{category_id}",
+            content_type="image/jpeg"
+        )
 
     category.name = name
     category.status = status
@@ -130,15 +132,15 @@ async def partial_update_category(
     if status is not None:
         category.status = status
     if image:
-        filename = f"{uuid4().hex}.jpg"
-        image_path = os.path.join("static/uploads", filename)
-        os.makedirs(os.path.dirname(image_path), exist_ok=True)
+        if category.image:
+            delete_from_firebase(category.image)
 
         compressed = compress_image(image, max_size=(800, 800), quality=75)
-        with open(image_path, "wb") as buffer:
-            buffer.write(compressed.read())
-
-        category.image = f"/static/uploads/{filename}"
+        category.image = upload_to_firebase(
+            compressed,
+            folder_path=f"categories/{category_id}",
+            content_type="image/jpeg"
+        )
 
     db.commit()
     db.refresh(category)
@@ -154,6 +156,10 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
+
+    if category.image:
+        delete_from_firebase(category.image)
+
     db.delete(category)
     db.commit()
 

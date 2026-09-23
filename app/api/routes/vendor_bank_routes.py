@@ -211,6 +211,7 @@ from app.crud import vendor_bank_crud
 from app.database import SessionLocal
 from app.core.security import get_current_vendor
 from app.core.security import get_current_admin
+from app.core.firebase_storage import upload_to_firebase, delete_from_firebase
 
 logger = logging.getLogger(__name__)
 
@@ -451,19 +452,23 @@ async def upload_bank_document(
                 detail="File size too large. Maximum 5MB allowed."
             )
 
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bank_{current_vendor.id}_{account_id}_{timestamp}{file_ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        # Delete old document from Firebase if exists
+        if account.bank_doc_url:
+            delete_from_firebase(account.bank_doc_url)
 
-        # Save file
-        with open(file_path, "wb") as buffer:
-            buffer.write(file_content)
+        # Upload to Firebase Storage under dedicated vendor folder
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder = f"vendors/{current_vendor.id}/bank_accounts/{account_id}"
+        download_url = upload_to_firebase(
+            file_content,
+            folder_path=folder,
+            custom_filename=f"bank_{current_vendor.id}_{account_id}_{timestamp}{file_ext}"
+        )
 
         # Update account with document info
         account.bank_doc_type = bank_doc_type
         account.bank_doc_number = bank_doc_number
-        account.bank_doc_url = file_path
+        account.bank_doc_url = download_url
         account.is_verified = False  # Set to pending verification
         
         db.commit()
