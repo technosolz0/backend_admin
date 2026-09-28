@@ -115,6 +115,11 @@ def upload_to_firebase(
                 raise ValueError(f"Unsupported file_data type: {type(file_data)}")
 
             try:
+                blob.patch()
+            except Exception as patch_err:
+                logger.warning(f"Failed to patch blob metadata for {blob_path}: {patch_err}")
+
+            try:
                 blob.make_public()
             except Exception:
                 # In case Uniform Bucket Access is active, download token handles access

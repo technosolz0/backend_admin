@@ -93,7 +93,7 @@ async def update_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    if image:
+    if image and image.filename:
         if category.image:
             delete_from_firebase(category.image)
 
@@ -131,7 +131,7 @@ async def partial_update_category(
         category.name = name
     if status is not None:
         category.status = status
-    if image:
+    if image and image.filename:
         if category.image:
             delete_from_firebase(category.image)
 
