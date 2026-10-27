@@ -22,6 +22,7 @@ class NotificationType(str, Enum):
     booking_completed = "booking_completed"
     otp_sent = "otp_sent"
     payment_created = "payment_created"
+    admin_status_updated = "admin_status_updated"
 
 def send_push_notification(token: str, title: str, body: str, data: dict = None):
     """

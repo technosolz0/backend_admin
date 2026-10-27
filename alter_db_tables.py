@@ -108,6 +108,18 @@ def alter_database_tables():
                         except Exception as e:
                             logger.warning(f"Could not add '{col_name}' to 'wallets': {e}")
 
+    # Step 3: PostgreSQL-specific enum alterations
+    if dialect_name in ("postgresql", "postgres"):
+        try:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
+                try:
+                    autocommit_conn.execute(text("ALTER TYPE vendor_status ADD VALUE IF NOT EXISTS 'inactive'"))
+                    logger.info("Ensured 'inactive' exists in vendor_status enum.")
+                except Exception as enum_err:
+                    logger.warning(f"Note on vendor_status enum: {enum_err}")
+        except Exception as e:
+            logger.warning(f"Could not connect for autocommit enum alteration: {e}")
+
     logger.info("Database migration & table alteration completed successfully!")
 
 

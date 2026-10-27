@@ -443,7 +443,6 @@ def delete_vendor(db: Session, vendor_id: int) -> Dict[str, Any]:
         db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).delete()
 
         # 3. Soft-delete and deactivate vendor
-        vendor.status = 'inactive'
         vendor.admin_status = 'inactive'
         vendor.work_status = 'work_off'
         vendor.is_deleted = True
@@ -647,8 +646,8 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
                 "data": None
             }
             
-        if vendor.status in ['rejected', 'inactive']:
-            logger.warning(f"Login attempt by deactivated vendor: {email}")
+        if getattr(vendor, 'is_deleted', False) or getattr(vendor, 'admin_status', None) == 'inactive' or vendor.status in ['rejected', 'inactive']:
+            logger.warning(f"Login attempt by deactivated/deleted vendor: {email}")
             return {
                 "success": False,
                 "message": "Your account has been deactivated or rejected. Please contact support.",
