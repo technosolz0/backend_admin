@@ -720,12 +720,22 @@ def fetch_service_charges_and_vendors(db: Session, category_id: int, sub_categor
                 ServiceProvider.city,
                 ServiceProvider.state,
                 ServiceProvider.profile_pic,
+                ServiceProvider.rating,
+                ServiceProvider.total_reviews,
+                ServiceProvider.experience,
+                ServiceProvider.experience_years,
+                ServiceProvider.education,
+                ServiceProvider.skills,
+                ServiceProvider.languages,
+                ServiceProvider.bio,
             )
             .join(ServiceProvider, ServiceProvider.id == VendorSubcategoryCharge.vendor_id)
             .filter(
                 and_(
                     VendorSubcategoryCharge.category_id == category_id,
                     VendorSubcategoryCharge.subcategory_id == sub_category_id,
+                    ServiceProvider.status == 'approved',
+                    ServiceProvider.admin_status == 'active',
                 )
             )
             .all()
@@ -738,14 +748,21 @@ def fetch_service_charges_and_vendors(db: Session, category_id: int, sub_categor
         for row in results:
             response.append({
                 "service_charge": row.service_charge,
+                "rating": float(row.rating or 0.0),
                 "vendor_details": {
                     "id": row.vendor_id,
                     "name": row.full_name,
-                    "email": row.email,
-                    "contact": row.phone,
                     "city": row.city,
                     "state": row.state,
-                    "profile_pic": row.profile_pic
+                    "profile_pic": row.profile_pic,
+                    "rating": float(row.rating or 0.0),
+                    "total_reviews": int(row.total_reviews or 0),
+                    "experience": row.experience,
+                    "experience_years": float(row.experience_years) if row.experience_years is not None else None,
+                    "education": row.education,
+                    "skills": row.skills,
+                    "languages": row.languages,
+                    "bio": row.bio,
                 }
             })
 

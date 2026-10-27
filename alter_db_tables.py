@@ -70,6 +70,25 @@ def alter_database_tables():
                 except Exception as e:
                     logger.warning(f"Could not add 'updated_at' to '{table_name}': {e}")
 
+            # Specific checks for vendors table professional columns
+            if table_name == "vendors":
+                new_vendor_cols = [
+                    ("education", "VARCHAR(255)"),
+                    ("experience", "VARCHAR(255)"),
+                    ("experience_years", "FLOAT"),
+                    ("bio", "TEXT"),
+                    ("skills", "TEXT"),
+                    ("languages", "VARCHAR(255)")
+                ]
+                for col_name, col_type in new_vendor_cols:
+                    if col_name not in column_names:
+                        logger.info(f"Adding '{col_name}' column to 'vendors'...")
+                        try:
+                            connection.execute(text(f"ALTER TABLE vendors ADD COLUMN {col_name} {col_type}"))
+                            logger.info(f"Successfully added '{col_name}' to 'vendors'.")
+                        except Exception as e:
+                            logger.warning(f"Could not add '{col_name}' to 'vendors': {e}")
+
     logger.info("Database migration & table alteration completed successfully!")
 
 

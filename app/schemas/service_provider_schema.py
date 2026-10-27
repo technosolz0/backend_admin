@@ -55,8 +55,21 @@ class VendorCreate(BaseModel):
     old_fcm_token: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    device_name: Optional[str] = None
     referral_code: Optional[str] = None
+    education: Optional[str] = None
+    experience: Optional[str] = None
+    experience_years: Optional[float] = None
+    bio: Optional[str] = None
+    skills: Optional[str] = None
+    languages: Optional[str] = None
+
+class VendorProfessionalDetailsUpdate(BaseModel):
+    education: Optional[str] = None
+    experience: Optional[str] = None
+    experience_years: Optional[float] = None
+    bio: Optional[str] = None
+    skills: Optional[str] = None
+    languages: Optional[str] = None
 
 class AddressDetailsUpdate(BaseModel):
     address: str
@@ -138,6 +151,12 @@ class VendorResponse(BaseModel):
     referral_code: Optional[str] = None
     referred_by: Optional[ReferralInfo] = None
     referrals_made: List[ReferralInfo] = []
+    education: Optional[str] = None
+    experience: Optional[str] = None
+    experience_years: Optional[float] = None
+    bio: Optional[str] = None
+    skills: Optional[str] = None
+    languages: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

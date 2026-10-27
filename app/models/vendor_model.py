@@ -42,6 +42,14 @@ class Vendor(Base):
     rating = Column(Float, default=0.0)
     total_reviews = Column(Integer, default=0)
 
+    # Professional & Profile Details (Optional)
+    education = Column(String, nullable=True)
+    experience = Column(String, nullable=True)
+    experience_years = Column(Float, nullable=True)
+    bio = Column(String, nullable=True)
+    skills = Column(String, nullable=True)
+    languages = Column(String, nullable=True)
+
     # Referral fields
     referral_code = Column(String, unique=True, index=True)
     referred_by_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)

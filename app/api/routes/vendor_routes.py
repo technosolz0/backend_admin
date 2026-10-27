@@ -9,7 +9,7 @@ from app.schemas.service_provider_schema import (
     PaginatedVendorsResponse, VendorCreate, VendorResponse, OTPRequest, OTPVerify,
     AddressDetailsUpdate, BankDetailsUpdate, WorkDetailsUpdate, VendorLoginRequest,
     VendorChangePasswordRequest, VendorPasswordResetRequest, VendorPasswordResetConfirm,
-    SubCategoryCharge
+    SubCategoryCharge, VendorProfessionalDetailsUpdate
 )
 from app.core.security import create_access_token, get_current_vendor, get_db
 from app.crud.vendor_crud import (
@@ -17,7 +17,7 @@ from app.crud.vendor_crud import (
     update_vendor_address, update_vendor_bank, update_vendor_work, 
     update_vendor_documents, change_vendor_admin_status, change_vendor_work_status, 
     vendor_login, get_all_vendors, delete_vendor, build_vendor_response,
-    change_vendor_password, get_vendor_by_id
+    change_vendor_password, get_vendor_by_id, update_vendor_professional_details
 )
 from app.schemas.category_schema import CategoryOut
 from app.schemas.sub_category_schema import SubCategoryOut
@@ -260,6 +260,19 @@ def update_documents(
     return update_vendor_documents(
         db, current_vendor.id, profile_pic, identity_doc, bank_doc, address_doc
     )
+
+
+@router.put("/update-professional-details", response_model=VendorResponse)
+@router.patch("/update-professional-details", response_model=VendorResponse)
+@router.put("/profile/professional", response_model=VendorResponse)
+@router.patch("/profile/professional", response_model=VendorResponse)
+def update_professional_details(
+    update: VendorProfessionalDetailsUpdate,
+    current_vendor: Vendor = Depends(get_current_vendor),
+    db: Session = Depends(get_db)
+):
+    """Update professional details like education, experience, bio, skills, and languages."""
+    return update_vendor_professional_details(db, current_vendor.id, update)
 
 
 @router.put("/change-password", response_model=dict)

@@ -13,10 +13,13 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Union
 import os
+import logging
 from dotenv import load_dotenv
 
 # Load .env variables
 load_dotenv()
+
+logger = logging.getLogger("app.core.security")
 
 from app.database import SessionLocal
 from app.models.user import User, UserStatus
@@ -86,29 +89,26 @@ def get_current_identity(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print(f"DEBUG: Decoded token payload: {payload}")
+        logger.debug(f"Decoded token payload for subject: {payload.get('sub')}")
         email: str = payload.get("sub")
         role: str = payload.get("role")  # 'user' or 'vendor'
         
         if email is None:
-            print("DEBUG: Email is None in payload")
+            logger.warning("Token validation failed: email is None in payload")
             raise credentials_exception
             
     except JWTError as e:
-        # Add logging for debugging
-        print(f"DEBUG: JWT decode error: {str(e)}")
+        logger.warning(f"JWT decode error: {e}")
         raise credentials_exception
 
     # Fetch based on role
     if role == 'vendor':
         vendor = db.query(ServiceProvider).filter(ServiceProvider.email == email).first()
-        # print(f"DEBUG: Found vendor: {vendor.email if vendor else 'None'}")
         if vendor is None:
-            print(f"Vendor not found for email: {email}")
+            logger.warning(f"Vendor not found for email: {email}")
             raise credentials_exception
             
         if vendor.status in ['rejected', 'inactive']:
-            # print(f"DEBUG: Vendor account blocked/inactive: {vendor.status}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been deactivated."
@@ -117,12 +117,11 @@ def get_current_identity(
         return vendor
     elif role == 'admin':
         user = db.query(User).filter(User.email == email).first()
-        # print(f"DEBUG: Found admin: {user.email if user else 'None'}")
         if user is None:
-            print(f"Admin user not found for email: {email}")
+            logger.warning(f"Admin user not found for email: {email}")
             raise credentials_exception
         if not user.is_superuser:
-            print(f"User {email} is not a superuser")
+            logger.warning(f"User {email} is not a superuser")
             raise credentials_exception
             
         if user.status == UserStatus.blocked:
@@ -134,13 +133,11 @@ def get_current_identity(
         return user
     else:  # default to user (role == 'user' or None)
         user = db.query(User).filter(User.email == email).first()
-        # print(f"DEBUG: Found user: {user.email if user else 'None'}")
         if user is None:
-            print(f"User not found for email: {email}")
+            logger.warning(f"User not found for email: {email}")
             raise credentials_exception
             
         if user.status == UserStatus.blocked:
-            # print(f"DEBUG: User account blocked")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been blocked."
@@ -206,7 +203,7 @@ def get_current_admin(
             )
 
     except JWTError as e:
-        print(f"JWT decode error: {str(e)}")
+        logger.warning(f"JWT decode error: {e}")
         raise credentials_exception
 
     # Fetch admin user

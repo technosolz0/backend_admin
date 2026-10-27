@@ -22,7 +22,7 @@ from app.models.vendor_bank_account_model import VendorBankAccount
 from app.schemas.service_provider_schema import (
     VendorCreate, VendorDeviceUpdate, AddressDetailsUpdate, 
     BankDetailsUpdate, WorkDetailsUpdate, SubCategoryCharge, VendorResponse,
-    ReferralInfo
+    ReferralInfo, VendorProfessionalDetailsUpdate
 )
 
 from app.schemas.service_provider_schema import BankAccountOut
@@ -205,6 +205,12 @@ def build_vendor_response(db: Session, vendor: Vendor) -> VendorResponse:
         referral_code=vendor.referral_code,
         referred_by=referred_by,
         referrals_made=referrals_made,
+        education=getattr(vendor, 'education', None),
+        experience=getattr(vendor, 'experience', None),
+        experience_years=getattr(vendor, 'experience_years', None),
+        bio=getattr(vendor, 'bio', None),
+        skills=getattr(vendor, 'skills', None),
+        languages=getattr(vendor, 'languages', None),
         created_at=vendor.created_at,
         updated_at=vendor.updated_at,
         bank_name=next(
@@ -1096,3 +1102,37 @@ def confirm_vendor_password_reset(db: Session, email: str, otp: Optional[str], n
             "message": "Something went wrong while resetting your password. Please try again.",
             "data": None
         }
+
+
+def update_vendor_professional_details(
+    db: Session,
+    vendor_id: int,
+    update: VendorProfessionalDetailsUpdate
+) -> VendorResponse:
+    """Updates optional professional profile details (education, experience, bio, skills, languages)."""
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=404,
+            detail="Vendor not found. Please verify your login credentials."
+        )
+
+    try:
+        update_data = update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(vendor, field):
+                setattr(vendor, field, value)
+
+        vendor.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(vendor)
+        logger.info(f"Vendor {vendor_id} professional details updated: {list(update_data.keys())}")
+        return build_vendor_response(db, vendor)
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating vendor professional details: {e}")
+        raise HTTPException(status_code=500, detail="Database error updating professional details.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error updating vendor professional details: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error updating professional details.")
