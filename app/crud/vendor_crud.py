@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.utils.otp_utils import generate_otp, send_email
 from app.core.security import get_password_hash
 from app.models.vendor_model import Vendor
+from app.models.wallet_model import Wallet
 from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
 from app.models.sub_category import SubCategory
 from app.models.category import Category
@@ -211,6 +212,8 @@ def build_vendor_response(db: Session, vendor: Vendor) -> VendorResponse:
         bio=getattr(vendor, 'bio', None),
         skills=getattr(vendor, 'skills', None),
         languages=getattr(vendor, 'languages', None),
+        is_deleted=getattr(vendor, 'is_deleted', False),
+        deleted_at=getattr(vendor, 'deleted_at', None),
         created_at=vendor.created_at,
         updated_at=vendor.updated_at,
         bank_name=next(
@@ -371,7 +374,14 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         }
 
 
-def get_all_vendors(db: Session, page: int = 1, limit: int = 10, search: Optional[str] = None, status: Optional[str] = None):
+def get_all_vendors(
+    db: Session,
+    page: int = 1,
+    limit: int = 10,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    include_deleted: bool = False
+):
     """Get all vendors with pagination, search, and status filters."""
     try:
         offset = (page - 1) * limit
@@ -382,6 +392,9 @@ def get_all_vendors(db: Session, page: int = 1, limit: int = 10, search: Optiona
                 joinedload(Vendor.subcategory_charges).joinedload(VendorSubcategoryCharge.subcategory)
             )
         )
+
+        if not include_deleted:
+            query = query.filter((Vendor.is_deleted == False) | (Vendor.is_deleted.is_(None)))
 
         if search:
             search_filter = f"%{search}%"
@@ -407,18 +420,43 @@ def get_all_vendors(db: Session, page: int = 1, limit: int = 10, search: Optiona
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-def delete_vendor(db: Session, vendor_id: int) -> None:
-    """Delete vendor by ID."""
+def delete_vendor(db: Session, vendor_id: int) -> Dict[str, Any]:
+    """Delete vendor by ID (soft-delete / deactivation) and freeze their wallet."""
     vendor = get_vendor_by_id(db, vendor_id)
     if not vendor:
         logger.error(f"Vendor not found for ID {vendor_id}")
         raise HTTPException(status_code=404, detail="Vendor not found")
     
     try:
+        # 1. Freeze / Deactivate vendor wallet if it exists
+        wallet = db.query(Wallet).filter(Wallet.vendor_id == vendor_id).first()
+        wallet_frozen = False
+        if wallet:
+            wallet.status = "FROZEN"
+            wallet.is_active = False
+            wallet.frozen_at = datetime.utcnow()
+            wallet.freeze_reason = f"Vendor account #{vendor_id} ({vendor.full_name}) deleted/deactivated"
+            wallet_frozen = True
+            logger.info(f"Wallet #{wallet.id} for vendor #{vendor_id} frozen successfully")
+
+        # 2. Clear volatile subcategory charges
         db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).delete()
-        db.delete(vendor)
+
+        # 3. Soft-delete and deactivate vendor
+        vendor.status = 'inactive'
+        vendor.admin_status = 'inactive'
+        vendor.work_status = 'work_off'
+        vendor.is_deleted = True
+        vendor.deleted_at = datetime.utcnow()
+
         db.commit()
-        logger.info(f"Vendor deleted successfully: ID {vendor_id}")
+        logger.info(f"Vendor deleted successfully: ID {vendor_id}, wallet frozen: {wallet_frozen}")
+        return {
+            "success": True,
+            "message": f"Vendor {vendor_id} deleted successfully and wallet frozen.",
+            "vendor_id": vendor_id,
+            "wallet_frozen": wallet_frozen
+        }
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Database error in delete_vendor: {str(e)}")

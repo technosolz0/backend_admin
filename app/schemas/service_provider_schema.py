@@ -157,6 +157,8 @@ class VendorResponse(BaseModel):
     bio: Optional[str] = None
     skills: Optional[str] = None
     languages: Optional[str] = None
+    is_deleted: Optional[bool] = False
+    deleted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

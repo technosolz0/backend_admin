@@ -359,9 +359,8 @@ def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/{vendor_id}", response_model=dict)
 def remove_vendor(vendor_id: int, db: Session = Depends(get_db)):
-    """Delete vendor by ID."""
-    delete_vendor(db, vendor_id)
-    return {"success": True, "message": f"Vendor {vendor_id} deleted successfully"}
+    """Delete vendor by ID (soft delete and freeze wallet)."""
+    return delete_vendor(db, vendor_id)
 
 
 @router.put("/{vendor_id}/admin-status", response_model=VendorResponse)

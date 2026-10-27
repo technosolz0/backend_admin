@@ -78,7 +78,9 @@ def alter_database_tables():
                     ("experience_years", "FLOAT"),
                     ("bio", "TEXT"),
                     ("skills", "TEXT"),
-                    ("languages", "VARCHAR(255)")
+                    ("languages", "VARCHAR(255)"),
+                    ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+                    ("deleted_at", "TIMESTAMP WITH TIME ZONE NULL" if dialect_name in ("postgresql", "postgres") else "DATETIME NULL"),
                 ]
                 for col_name, col_type in new_vendor_cols:
                     if col_name not in column_names:
@@ -88,6 +90,23 @@ def alter_database_tables():
                             logger.info(f"Successfully added '{col_name}' to 'vendors'.")
                         except Exception as e:
                             logger.warning(f"Could not add '{col_name}' to 'vendors': {e}")
+
+            # Specific checks for wallets table
+            if table_name == "wallets":
+                new_wallet_cols = [
+                    ("status", "VARCHAR(50) DEFAULT 'ACTIVE'"),
+                    ("is_active", "BOOLEAN DEFAULT TRUE"),
+                    ("frozen_at", "TIMESTAMP WITH TIME ZONE NULL" if dialect_name in ("postgresql", "postgres") else "DATETIME NULL"),
+                    ("freeze_reason", "VARCHAR(255) NULL"),
+                ]
+                for col_name, col_type in new_wallet_cols:
+                    if col_name not in column_names:
+                        logger.info(f"Adding '{col_name}' column to 'wallets'...")
+                        try:
+                            connection.execute(text(f"ALTER TABLE wallets ADD COLUMN {col_name} {col_type}"))
+                            logger.info(f"Successfully added '{col_name}' to 'wallets'.")
+                        except Exception as e:
+                            logger.warning(f"Could not add '{col_name}' to 'wallets': {e}")
 
     logger.info("Database migration & table alteration completed successfully!")
 

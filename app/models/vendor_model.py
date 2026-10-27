@@ -59,6 +59,8 @@ class Vendor(Base):
     status = Column(SAEnum('pending', 'approved', 'rejected', 'inactive', name='vendor_status'), default='approved')
     admin_status = Column(SAEnum('active', 'inactive', name='admin_status'), default='inactive')
     work_status = Column(SAEnum('work_on', 'work_off', name='work_status'), default='work_on')
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
 
     otp = Column(String)
     otp_created_at = Column(DateTime)

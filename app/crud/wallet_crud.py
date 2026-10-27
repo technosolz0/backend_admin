@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.models.wallet_model import Wallet
@@ -61,9 +62,47 @@ def update_wallet_balance(db: Session, wallet_id: int, new_balance: float):
 
     wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
     if wallet:
+        if wallet.status == "FROZEN" or not wallet.is_active:
+            raise ValueError(f"Cannot update balance: Wallet #{wallet_id} is frozen/deactivated ({wallet.freeze_reason or 'No reason provided'})")
         wallet.balance = new_balance
         db.commit()
         db.refresh(wallet)
+    return wallet
+
+def freeze_wallet(db: Session, wallet_id: int, reason: str = "Frozen by administrator"):
+    wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
+    if not wallet:
+        return None
+    wallet.status = "FROZEN"
+    wallet.is_active = False
+    wallet.frozen_at = datetime.utcnow()
+    wallet.freeze_reason = reason
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+def unfreeze_wallet(db: Session, wallet_id: int):
+    wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
+    if not wallet:
+        return None
+    wallet.status = "ACTIVE"
+    wallet.is_active = True
+    wallet.frozen_at = None
+    wallet.freeze_reason = None
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+def deactivate_wallet(db: Session, wallet_id: int, reason: str = "Deactivated by administrator"):
+    wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
+    if not wallet:
+        return None
+    wallet.status = "DEACTIVATED"
+    wallet.is_active = False
+    wallet.frozen_at = datetime.utcnow()
+    wallet.freeze_reason = reason
+    db.commit()
+    db.refresh(wallet)
     return wallet
 
 def get_all_wallets(db: Session, skip: int = 0, limit: int = 100):

@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, CheckConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 from app.database import Base
 
@@ -10,7 +10,12 @@ class Wallet(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
     balance = Column(Float, default=0.0)
+    status = Column(String, default="ACTIVE", nullable=False)  # ACTIVE, FROZEN, DEACTIVATED
+    is_active = Column(Boolean, default=True, nullable=False)
+    frozen_at = Column(DateTime, nullable=True)
+    freeze_reason = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Ensure wallet belongs to either user OR vendor, but not both or neither
     __table_args__ = (
@@ -20,8 +25,8 @@ class Wallet(Base):
         ),
     )
 
-    user = relationship("User", backref="wallets")
-    vendor = relationship("Vendor", backref="wallets")
+    user = relationship("User", backref=backref("wallets", passive_deletes=True))
+    vendor = relationship("Vendor", backref=backref("wallets", passive_deletes=True))
     transactions = relationship("WalletTransaction", back_populates="wallet", cascade="all, delete-orphan")
 
 

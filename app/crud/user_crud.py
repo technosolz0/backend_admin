@@ -15,6 +15,7 @@ from app.models.category import Category
 from app.models.sub_category import SubCategory
 from app.models.service_provider_model import ServiceProvider
 from app.models.vendor_subcategory_charge import VendorSubcategoryCharge
+from app.models.wallet_model import Wallet
 
 logger = logging.getLogger(__name__)
 
@@ -558,6 +559,22 @@ def delete_user(db: Session, user_id: int) -> Dict[str, Any]:
                 "data": None
             }
         
+        # Check if user has a wallet
+        wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+        if wallet:
+            wallet.status = "FROZEN"
+            wallet.is_active = False
+            wallet.frozen_at = datetime.utcnow()
+            wallet.freeze_reason = f"User account #{user_id} deleted"
+            user.status = UserStatus.blocked
+            db.commit()
+            logger.info(f"User {user_id} blocked and wallet #{wallet.id} frozen successfully")
+            return {
+                "success": True,
+                "message": "User deleted successfully and wallet frozen.",
+                "data": None
+            }
+
         db.delete(user)
         db.commit()
         logger.info(f"User deleted successfully: {user_id}")

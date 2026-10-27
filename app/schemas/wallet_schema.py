@@ -32,21 +32,29 @@ class WalletCreate(BaseModel):
         return v
 
 class WalletUpdate(BaseModel):
-    balance: float
+    balance: Optional[float] = None
+    status: Optional[str] = None  # ACTIVE, FROZEN, DEACTIVATED
+    is_active: Optional[bool] = None
+    freeze_reason: Optional[str] = None
 
     @field_validator('balance')
     @classmethod
-    def balance_must_be_non_negative(cls, v: float) -> float:
-        if v < 0:
+    def balance_must_be_non_negative(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
             raise ValueError('Balance cannot be negative')
         return v
 
 class WalletOut(BaseModel):
     id: int
-    user_id: Optional[int]
-    vendor_id: Optional[int]
+    user_id: Optional[int] = None
+    vendor_id: Optional[int] = None
     balance: float
+    status: Optional[str] = "ACTIVE"
+    is_active: Optional[bool] = True
+    frozen_at: Optional[datetime] = None
+    freeze_reason: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -337,41 +337,47 @@ def process_first_booking_referral_reward(db: Session, booking: Booking) -> bool
         # Referrer Wallet Credit (only if there is an actual referrer vendor)
         if referral.referrer_vendor_id:
             referrer_wallet = get_or_create_vendor_wallet(db, referral.referrer_vendor_id)
-            referrer_wallet.balance += referrer_amount
+            if referrer_wallet.status != "FROZEN" and referrer_wallet.is_active:
+                referrer_wallet.balance += referrer_amount
 
-            referrer_tx_ref = f"REF_BONUS_REFERRER_{referral.id}"
-            existing_tx = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referrer_tx_ref).first()
-            if not existing_tx:
-                db.add(WalletTransaction(
-                    wallet_id=referrer_wallet.id,
-                    vendor_id=referral.referrer_vendor_id,
-                    referral_id=referral.id,
-                    booking_id=booking.id,
-                    amount=referrer_amount,
-                    transaction_type="REFERRAL_BONUS_REFERRER",
-                    description=f"Referral bonus for referring Vendor #{vendor_id}",
-                    status="COMPLETED",
-                    reference_id=referrer_tx_ref
-                ))
+                referrer_tx_ref = f"REF_BONUS_REFERRER_{referral.id}"
+                existing_tx = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referrer_tx_ref).first()
+                if not existing_tx:
+                    db.add(WalletTransaction(
+                        wallet_id=referrer_wallet.id,
+                        vendor_id=referral.referrer_vendor_id,
+                        referral_id=referral.id,
+                        booking_id=booking.id,
+                        amount=referrer_amount,
+                        transaction_type="REFERRAL_BONUS_REFERRER",
+                        description=f"Referral bonus for referring Vendor #{vendor_id}",
+                        status="COMPLETED",
+                        reference_id=referrer_tx_ref
+                    ))
+            else:
+                logger.warning(f"Referrer wallet {referrer_wallet.id} is frozen/inactive. Skipping credit.")
 
         # Referred Vendor Wallet Credit (Welcome bonus)
         referred_wallet = get_or_create_vendor_wallet(db, referral.referred_vendor_id)
-        referred_wallet.balance += referred_amount
+        if referred_wallet.status != "FROZEN" and referred_wallet.is_active:
+            referred_wallet.balance += referred_amount
 
-        referred_tx_ref = f"REF_BONUS_REFERRED_{referral.id}"
-        existing_tx2 = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referred_tx_ref).first()
-        if not existing_tx2:
-            db.add(WalletTransaction(
-                wallet_id=referred_wallet.id,
-                vendor_id=referral.referred_vendor_id,
-                referral_id=referral.id,
-                booking_id=booking.id,
-                amount=referred_amount,
-                transaction_type="REFERRAL_BONUS_NEW_VENDOR",
-                description="Welcome referral bonus for completing first booking",
-                status="COMPLETED",
-                reference_id=referred_tx_ref
-            ))
+            referred_tx_ref = f"REF_BONUS_REFERRED_{referral.id}"
+            existing_tx2 = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referred_tx_ref).first()
+            if not existing_tx2:
+                db.add(WalletTransaction(
+                    wallet_id=referred_wallet.id,
+                    vendor_id=referral.referred_vendor_id,
+                    referral_id=referral.id,
+                    booking_id=booking.id,
+                    amount=referred_amount,
+                    transaction_type="REFERRAL_BONUS_NEW_VENDOR",
+                    description="Welcome referral bonus for completing first booking",
+                    status="COMPLETED",
+                    reference_id=referred_tx_ref
+                ))
+        else:
+            logger.warning(f"Referred vendor wallet {referred_wallet.id} is frozen/inactive. Skipping credit.")
 
         # Mark Rewarded
         referral.status = ReferralStatus.REWARDED
@@ -537,41 +543,47 @@ def process_first_user_booking_referral_reward(db: Session, booking: Booking) ->
         # Referrer User Wallet Credit (only if user referral)
         if referral.referrer_user_id:
             referrer_wallet = get_or_create_user_wallet(db, referral.referrer_user_id)
-            referrer_wallet.balance += referrer_amount
+            if referrer_wallet.status != "FROZEN" and referrer_wallet.is_active:
+                referrer_wallet.balance += referrer_amount
 
-            referrer_tx_ref = f"USER_REF_BONUS_REFERRER_{referral.id}"
-            existing_tx = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referrer_tx_ref).first()
-            if not existing_tx:
-                db.add(WalletTransaction(
-                    wallet_id=referrer_wallet.id,
-                    user_id=referral.referrer_user_id,
-                    user_referral_id=referral.id,
-                    booking_id=booking.id,
-                    amount=referrer_amount,
-                    transaction_type="USER_REFERRAL_BONUS_REFERRER",
-                    description=f"Referral bonus for referring customer #{user_id}",
-                    status="COMPLETED",
-                    reference_id=referrer_tx_ref
-                ))
+                referrer_tx_ref = f"USER_REF_BONUS_REFERRER_{referral.id}"
+                existing_tx = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referrer_tx_ref).first()
+                if not existing_tx:
+                    db.add(WalletTransaction(
+                        wallet_id=referrer_wallet.id,
+                        user_id=referral.referrer_user_id,
+                        user_referral_id=referral.id,
+                        booking_id=booking.id,
+                        amount=referrer_amount,
+                        transaction_type="USER_REFERRAL_BONUS_REFERRER",
+                        description=f"Referral bonus for referring customer #{user_id}",
+                        status="COMPLETED",
+                        reference_id=referrer_tx_ref
+                    ))
+            else:
+                logger.warning(f"Referrer user wallet {referrer_wallet.id} is frozen/inactive. Skipping credit.")
 
         # Referred User Wallet Credit (Welcome bonus)
         referred_wallet = get_or_create_user_wallet(db, referral.referred_user_id)
-        referred_wallet.balance += referred_amount
+        if referred_wallet.status != "FROZEN" and referred_wallet.is_active:
+            referred_wallet.balance += referred_amount
 
-        referred_tx_ref = f"USER_REF_BONUS_REFERRED_{referral.id}"
-        existing_tx2 = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referred_tx_ref).first()
-        if not existing_tx2:
-            db.add(WalletTransaction(
-                wallet_id=referred_wallet.id,
-                user_id=referral.referred_user_id,
-                user_referral_id=referral.id,
-                booking_id=booking.id,
-                amount=referred_amount,
-                transaction_type="USER_REFERRAL_BONUS_NEW_USER",
-                description="Welcome referral bonus for completing first booking",
-                status="COMPLETED",
-                reference_id=referred_tx_ref
-            ))
+            referred_tx_ref = f"USER_REF_BONUS_REFERRED_{referral.id}"
+            existing_tx2 = db.query(WalletTransaction).filter(WalletTransaction.reference_id == referred_tx_ref).first()
+            if not existing_tx2:
+                db.add(WalletTransaction(
+                    wallet_id=referred_wallet.id,
+                    user_id=referral.referred_user_id,
+                    user_referral_id=referral.id,
+                    booking_id=booking.id,
+                    amount=referred_amount,
+                    transaction_type="USER_REFERRAL_BONUS_NEW_USER",
+                    description="Welcome referral bonus for completing first booking",
+                    status="COMPLETED",
+                    reference_id=referred_tx_ref
+                ))
+        else:
+            logger.warning(f"Referred user wallet {referred_wallet.id} is frozen/inactive. Skipping credit.")
 
         # Mark Rewarded
         referral.status = ReferralStatus.REWARDED

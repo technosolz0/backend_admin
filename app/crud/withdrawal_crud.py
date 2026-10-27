@@ -1,9 +1,11 @@
 # app/crud/withdrawal_crud.py
 
 from datetime import datetime
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 from app.models.withdrawal_model import Withdrawal, WithdrawalStatus
+from app.models.wallet_model import Wallet
 from app.schemas.withdrawal_schema import WithdrawalRequest, WithdrawalUpdate
 from typing import List, Optional
 import logging
@@ -24,6 +26,13 @@ def calculate_commission(gross_amount: float) -> tuple[float, float]:
 
 def create_withdrawal(db: Session, vendor_id: int, withdrawal_data: WithdrawalRequest) -> Withdrawal:
     """Create a new withdrawal request"""
+    # Check if vendor wallet is frozen
+    wallet = db.query(Wallet).filter(Wallet.vendor_id == vendor_id).first()
+    if wallet and (wallet.status == "FROZEN" or not wallet.is_active):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Withdrawal cannot be initiated: Vendor wallet is frozen ({wallet.freeze_reason or 'Account deactivated'})."
+        )
     # The amount vendor requests is already net (after commission)
     # We need to calculate back the gross amount
     net_amount = withdrawal_data.amount

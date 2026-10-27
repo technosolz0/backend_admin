@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.security import get_db
 from app.schemas.wallet_schema import WalletCreate, WalletUpdate, WalletOut
 from app.crud import wallet_crud
@@ -53,6 +53,22 @@ def update_wallet_balance(wallet_id: int, update_data: WalletUpdate, db: Session
 @router.get("/", response_model=List[WalletOut])
 def get_all_wallets(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return wallet_crud.get_all_wallets(db, skip, limit)
+
+@router.put("/{wallet_id}/freeze", response_model=WalletOut)
+def freeze_wallet(wallet_id: int, reason: Optional[str] = Body(None, embed=True), db: Session = Depends(get_db)):
+    """Freeze a wallet by ID, blocking all balance updates and withdrawals."""
+    wallet = wallet_crud.freeze_wallet(db, wallet_id, reason or "Manual freeze by admin")
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    return wallet
+
+@router.put("/{wallet_id}/unfreeze", response_model=WalletOut)
+def unfreeze_wallet(wallet_id: int, db: Session = Depends(get_db)):
+    """Unfreeze an active wallet."""
+    wallet = wallet_crud.unfreeze_wallet(db, wallet_id)
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    return wallet
 
 @router.delete("/{wallet_id}")
 def delete_wallet(wallet_id: int, db: Session = Depends(get_db)):
