@@ -77,11 +77,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_vendor_by_email(db: Session, email: str) -> Vendor:
-    """Get vendor by email or phone number."""
+    """Get active vendor by email or phone number (excludes deleted accounts)."""
     try:
         clean_identifier = email.strip()
         return db.query(Vendor).filter(
-            or_(Vendor.email == clean_identifier, Vendor.phone == clean_identifier)
+            or_(Vendor.email == clean_identifier, Vendor.phone == clean_identifier),
+            (Vendor.is_deleted == False) | (Vendor.is_deleted.is_(None))
         ).first()
     except SQLAlchemyError as e:
         logger.error(f"Database error fetching vendor by email/phone: {str(e)}")
@@ -230,12 +231,28 @@ def build_vendor_response(db: Session, vendor: Vendor) -> VendorResponse:
 # =================== VENDOR REGISTRATION ===================
 
 def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
-    """Create a new vendor and send OTP."""
+    """Create a new vendor and send OTP. Allows re-registration if previously deleted."""
     try:
+        # 1. Release email, phone, and referral code from any previously deleted vendor accounts
+        deleted_vendors = db.query(Vendor).filter(
+            or_(Vendor.email == vendor.email, Vendor.phone == vendor.phone),
+            Vendor.is_deleted == True
+        ).all()
+        for dv in deleted_vendors:
+            logger.info(f"Releasing email/phone from deleted vendor #{dv.id} to allow re-registration")
+            if dv.email and not dv.email.startswith("deleted_"):
+                dv.email = f"deleted_{dv.id}_{dv.email}"
+            if dv.phone and not dv.phone.startswith("deleted_"):
+                dv.phone = f"deleted_{dv.id}_{dv.phone}"
+            if dv.referral_code and not dv.referral_code.startswith("deleted_"):
+                dv.referral_code = f"deleted_{dv.id}_{dv.referral_code}"
+        if deleted_vendors:
+            db.commit()
+
         existing = get_vendor_by_email(db, email=vendor.email)
         
         # Only consider vendor as registered if they verified OTP AND completed step one (step > 1)
-        if existing and existing.otp_verified and existing.step > 1:
+        if existing and not getattr(existing, 'is_deleted', False) and existing.otp_verified and existing.step > 1:
             logger.warning(f"Vendor registration attempt with existing registered email: {vendor.email}")
             return {
                 "success": False,
@@ -245,6 +262,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         
         existing_phone = db.query(Vendor).filter(
             Vendor.phone == vendor.phone,
+            (Vendor.is_deleted == False) | (Vendor.is_deleted.is_(None)),
             Vendor.otp_verified == True,
             Vendor.step > 1
         ).first()
@@ -260,6 +278,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
         # Free up phone from any uncompleted/abandoned account
         other_uncompleted_phones = db.query(Vendor).filter(
             Vendor.phone == vendor.phone,
+            (Vendor.is_deleted == False) | (Vendor.is_deleted.is_(None)),
             (Vendor.otp_verified == False) | (Vendor.step <= 1)
         ).all()
         for other_p in other_uncompleted_phones:
@@ -267,7 +286,7 @@ def create_vendor(db: Session, vendor: VendorCreate) -> Dict[str, Any]:
                 other_p.phone = f"{other_p.phone}_abandoned_{other_p.id}"
         db.commit()
 
-        if existing and (not existing.otp_verified or existing.step <= 1):
+        if existing and not getattr(existing, 'is_deleted', False) and (not existing.otp_verified or existing.step <= 1):
             logger.info(f"Updating existing uncompleted vendor: {vendor.email}")
             existing.full_name = vendor.full_name
             existing.phone = vendor.phone
@@ -442,11 +461,18 @@ def delete_vendor(db: Session, vendor_id: int) -> Dict[str, Any]:
         # 2. Clear volatile subcategory charges
         db.query(VendorSubcategoryCharge).filter(VendorSubcategoryCharge.vendor_id == vendor_id).delete()
 
-        # 3. Soft-delete and deactivate vendor
+        # 3. Soft-delete and deactivate vendor, and release email/phone so they can register again
+        vendor.status = 'inactive'
         vendor.admin_status = 'inactive'
         vendor.work_status = 'work_off'
         vendor.is_deleted = True
         vendor.deleted_at = datetime.utcnow()
+        if vendor.email and not vendor.email.startswith("deleted_"):
+            vendor.email = f"deleted_{vendor.id}_{vendor.email}"
+        if vendor.phone and not vendor.phone.startswith("deleted_"):
+            vendor.phone = f"deleted_{vendor.id}_{vendor.phone}"
+        if vendor.referral_code and not vendor.referral_code.startswith("deleted_"):
+            vendor.referral_code = f"deleted_{vendor.id}_{vendor.referral_code}"
 
         db.commit()
         logger.info(f"Vendor deleted successfully: ID {vendor_id}, wallet frozen: {wallet_frozen}")
@@ -469,7 +495,10 @@ def verify_vendor_otp(db: Session, email: Optional[str] = None, otp: Optional[st
         if email:
             vendor = get_vendor_by_email(db, email)
         if not vendor and phone:
-            vendor = db.query(Vendor).filter(Vendor.phone == phone).first()
+            vendor = db.query(Vendor).filter(
+                Vendor.phone == phone,
+                (Vendor.is_deleted == False) | (Vendor.is_deleted.is_(None))
+            ).first()
         
         if not vendor:
             logger.warning(f"OTP verification attempt for non-existent account: email={email}, phone={phone}")
@@ -646,7 +675,7 @@ def vendor_login(db: Session, email: str, password: str) -> Dict[str, Any]:
                 "data": None
             }
             
-        if getattr(vendor, 'is_deleted', False) or getattr(vendor, 'admin_status', None) == 'inactive' or vendor.status in ['rejected', 'inactive']:
+        if getattr(vendor, 'is_deleted', False) or vendor.status in ['rejected', 'inactive']:
             logger.warning(f"Login attempt by deactivated/deleted vendor: {email}")
             return {
                 "success": False,

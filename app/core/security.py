@@ -108,7 +108,7 @@ def get_current_identity(
             logger.warning(f"Vendor not found for email: {email}")
             raise credentials_exception
             
-        if getattr(vendor, 'is_deleted', False) or getattr(vendor, 'admin_status', None) == 'inactive' or vendor.status in ['rejected', 'inactive']:
+        if getattr(vendor, 'is_deleted', False) or vendor.status in ['rejected', 'inactive']:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Your account has been deactivated."
