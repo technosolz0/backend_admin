@@ -890,40 +890,40 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
     allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf'}
     max_file_size = 5 * 1024 * 1024
 
-    def save_file(file: Any, subdir: str, prefix: str, old_file_url: str = None) -> str:
+    def save_file(file: Any, doc_name: str, old_file_url: str = None) -> str:
         try:
             filename = getattr(file, "filename", "") or ""
             ext = filename.split(".")[-1].lower() if "." in filename else ""
             if ext not in allowed_extensions:
-                logger.error(f"Invalid file type for {prefix}: {ext}")
-                raise HTTPException(status_code=400, detail=f"The {prefix} file type is not valid. Please upload one of: {', '.join(allowed_extensions)}")
+                logger.error(f"Invalid file type for {doc_name}: {ext}")
+                raise HTTPException(status_code=400, detail=f"The {doc_name} file type is not valid. Please upload one of: {', '.join(allowed_extensions)}")
             
             # Check file size if available
             if hasattr(file, "size") and file.size and file.size > max_file_size:
-                logger.error(f"{prefix} file too large: {file.size} bytes")
-                raise HTTPException(status_code=400, detail=f"The {prefix} file is too large. The maximum size is {max_file_size // (1024*1024)}MB.")
+                logger.error(f"{doc_name} file too large: {file.size} bytes")
+                raise HTTPException(status_code=400, detail=f"The {doc_name} file is too large. The maximum size is {max_file_size // (1024*1024)}MB.")
 
             # Delete old file from Firebase/disk if replacing
             if old_file_url:
                 delete_from_firebase(old_file_url)
 
-            folder = f"vendors/{vendor_id}/{subdir}"
-            custom_filename = f"{prefix}_{vendor_id}.{ext}"
+            folder = f"vendorDocument/{vendor_id}"
+            custom_filename = f"{doc_name}.{ext}"
             return upload_to_firebase(file, folder_path=folder, custom_filename=custom_filename)
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error saving {prefix} file: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"We couldn't save your {prefix} file. Please try again.")
+            logger.error(f"Error saving {doc_name} file: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"We couldn't save your {doc_name} file. Please try again.")
 
     try:
         if profile_pic and getattr(profile_pic, "filename", None):
-            vendor.profile_pic = save_file(profile_pic, "profile", "profile", vendor.profile_pic)
+            vendor.profile_pic = save_file(profile_pic, "profile_pic", vendor.profile_pic)
         
-        vendor.identity_doc_url = save_file(identity_doc, "documents/identity", "identity", vendor.identity_doc_url)
+        vendor.identity_doc_url = save_file(identity_doc, "identity_document", vendor.identity_doc_url)
         if bank_doc and getattr(bank_doc, "filename", None):
-            vendor.bank_doc_url = save_file(bank_doc, "documents/bank", "bank", vendor.bank_doc_url)
-        vendor.address_doc_url = save_file(address_doc, "documents/address", "address", vendor.address_doc_url)
+            vendor.bank_doc_url = save_file(bank_doc, "bank_document", vendor.bank_doc_url)
+        vendor.address_doc_url = save_file(address_doc, "address_document", vendor.address_doc_url)
         
         if vendor.step <= 3:
             vendor.step = 4

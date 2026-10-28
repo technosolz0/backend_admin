@@ -458,11 +458,11 @@ async def upload_bank_document(
 
         # Upload to Firebase Storage under dedicated vendor folder
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder = f"vendors/{current_vendor.id}/bank_accounts/{account_id}"
+        folder = f"vendorDocument/{current_vendor.id}/bank_accounts"
         download_url = upload_to_firebase(
             file_content,
             folder_path=folder,
-            custom_filename=f"bank_{current_vendor.id}_{account_id}_{timestamp}{file_ext}"
+            custom_filename=f"bank_account_{account_id}_{timestamp}{file_ext}"
         )
 
         # Update account with document info

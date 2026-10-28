@@ -59,6 +59,7 @@ def sanitize_folder_path(folder_path: str) -> str:
     Sanitizes folder paths to strictly prevent path traversal attacks (e.g. '../', '/').
     Only allows alphanumeric characters, underscores, and hyphens in folder segments.
     """
+    
     if not folder_path:
         return "uploads"
 
