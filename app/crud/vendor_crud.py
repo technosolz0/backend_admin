@@ -890,9 +890,10 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
     allowed_extensions = {'jpg', 'jpeg', 'png', 'pdf'}
     max_file_size = 5 * 1024 * 1024
 
-    def save_file(file: UploadFile, subdir: str, prefix: str, old_file_url: str = None) -> str:
+    def save_file(file: Any, subdir: str, prefix: str, old_file_url: str = None) -> str:
         try:
-            ext = file.filename.split(".")[-1].lower() if file.filename else ""
+            filename = getattr(file, "filename", "") or ""
+            ext = filename.split(".")[-1].lower() if "." in filename else ""
             if ext not in allowed_extensions:
                 logger.error(f"Invalid file type for {prefix}: {ext}")
                 raise HTTPException(status_code=400, detail=f"The {prefix} file type is not valid. Please upload one of: {', '.join(allowed_extensions)}")
@@ -916,11 +917,11 @@ def update_vendor_documents(db: Session, vendor_id: int, profile_pic: UploadFile
             raise HTTPException(status_code=500, detail=f"We couldn't save your {prefix} file. Please try again.")
 
     try:
-        if profile_pic:
+        if profile_pic and getattr(profile_pic, "filename", None):
             vendor.profile_pic = save_file(profile_pic, "profile", "profile", vendor.profile_pic)
         
         vendor.identity_doc_url = save_file(identity_doc, "documents/identity", "identity", vendor.identity_doc_url)
-        if bank_doc:
+        if bank_doc and getattr(bank_doc, "filename", None):
             vendor.bank_doc_url = save_file(bank_doc, "documents/bank", "bank", vendor.bank_doc_url)
         vendor.address_doc_url = save_file(address_doc, "documents/address", "address", vendor.address_doc_url)
         

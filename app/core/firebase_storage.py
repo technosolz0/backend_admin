@@ -5,9 +5,12 @@ import uuid
 import mimetypes
 import logging
 import urllib.parse
-from typing import Union, Optional, Set
+from typing import Union, Optional, Set, Any
 from datetime import datetime
 from fastapi import UploadFile, HTTPException, status
+from starlette.datastructures import UploadFile as StarletteUploadFile
+
+UploadFileTypes = (UploadFile, StarletteUploadFile)
 
 import firebase_admin
 from firebase_admin import credentials, storage
@@ -32,9 +35,9 @@ MAX_FILE_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB default limit
 CHUNK_SIZE_BYTES: int = 64 * 1024            # 64 KB chunk size for streaming read
 
 DEFAULT_ALLOWED_EXTENSIONS: Set[str] = {
-    ".jpg", ".jpeg", ".png", ".webp", ".gif",
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-    ".txt", ".csv"
+    ".jpg", ".jpeg", ".png", ".webp", 
+    ".pdf", ".doc", ".docx", 
+   ".csv"
 }
 
 DANGEROUS_EXTENSIONS: Set[str] = {
@@ -176,26 +179,36 @@ def get_firebase_bucket():
 
 
 def read_file_safely(
-    file_data: Union[UploadFile, bytes, io.BytesIO],
+    file_data: Union[UploadFile, StarletteUploadFile, bytes, io.BytesIO, Any],
     max_size_bytes: int = MAX_FILE_SIZE_BYTES
 ) -> bytes:
     """
     Reads file content with strict size enforcement to prevent Memory Exhaustion DoS attacks.
+    Supports FastAPI/Starlette UploadFile, BytesIO, bytes, and any file-like objects.
     """
-    # 1. Fast check if size is already known
-    if isinstance(file_data, UploadFile):
-        if hasattr(file_data, "size") and file_data.size and file_data.size > max_size_bytes:
+    if file_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No file provided for upload."
+        )
+
+    # 1. FastAPI / Starlette UploadFile or object wrapping an underlying file
+    if isinstance(file_data, UploadFileTypes) or hasattr(file_data, "file"):
+        underlying = getattr(file_data, "file", file_data)
+        file_size = getattr(file_data, "size", None)
+        if file_size and file_size > max_size_bytes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File exceeds maximum allowed size of {max_size_bytes // (1024 * 1024)}MB."
             )
 
-        file_data.file.seek(0)
+        if hasattr(underlying, "seek"):
+            underlying.seek(0)
         buffer = bytearray()
         total_read = 0
 
         while True:
-            chunk = file_data.file.read(CHUNK_SIZE_BYTES)
+            chunk = underlying.read(CHUNK_SIZE_BYTES)
             if not chunk:
                 break
             total_read += len(chunk)
@@ -206,10 +219,11 @@ def read_file_safely(
                 )
             buffer.extend(chunk)
 
-        file_data.file.seek(0)
+        if hasattr(underlying, "seek"):
+            underlying.seek(0)
         return bytes(buffer)
 
-    elif isinstance(file_data, io.BytesIO):
+    elif isinstance(file_data, io.BytesIO) or (hasattr(file_data, "getvalue") and hasattr(file_data, "seek")):
         file_data.seek(0)
         content = file_data.getvalue()
         if len(content) > max_size_bytes:
@@ -219,13 +233,33 @@ def read_file_safely(
             )
         return content
 
-    elif isinstance(file_data, bytes):
+    elif isinstance(file_data, (bytes, bytearray)):
         if len(file_data) > max_size_bytes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File exceeds maximum allowed size of {max_size_bytes // (1024 * 1024)}MB."
             )
-        return file_data
+        return bytes(file_data)
+
+    elif hasattr(file_data, "read"):
+        if hasattr(file_data, "seek"):
+            file_data.seek(0)
+        buffer = bytearray()
+        total_read = 0
+        while True:
+            chunk = file_data.read(CHUNK_SIZE_BYTES)
+            if not chunk:
+                break
+            total_read += len(chunk)
+            if total_read > max_size_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File exceeds maximum allowed size of {max_size_bytes // (1024 * 1024)}MB."
+                )
+            buffer.extend(chunk)
+        if hasattr(file_data, "seek"):
+            file_data.seek(0)
+        return bytes(buffer)
 
     else:
         raise HTTPException(
@@ -235,7 +269,7 @@ def read_file_safely(
 
 
 def upload_to_firebase(
-    file_data: Union[UploadFile, bytes, io.BytesIO],
+    file_data: Union[UploadFile, StarletteUploadFile, bytes, io.BytesIO, Any],
     folder_path: str,
     custom_filename: Optional[str] = None,
     content_type: Optional[str] = None,
@@ -254,9 +288,9 @@ def upload_to_firebase(
 
     # 2. Extract and sanitize file extension & filename
     original_filename = ""
-    if isinstance(file_data, UploadFile):
-        original_filename = file_data.filename or "file"
-        if not content_type and file_data.content_type:
+    if isinstance(file_data, UploadFileTypes) or hasattr(file_data, "filename"):
+        original_filename = getattr(file_data, "filename", None) or "file"
+        if not content_type and getattr(file_data, "content_type", None):
             content_type = file_data.content_type
 
     detected_ext = os.path.splitext(original_filename)[1].lower() if original_filename else ".jpg"

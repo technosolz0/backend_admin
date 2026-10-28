@@ -249,9 +249,9 @@ def update_work(
 
 @router.put("/update-documents", response_model=VendorResponse)
 def update_documents(
-    profile_pic: UploadFile = File(None),
+    profile_pic: Optional[UploadFile] = File(None),
     identity_doc: UploadFile = File(...),
-    bank_doc: UploadFile = File(None),
+    bank_doc: Optional[UploadFile] = File(None),
     address_doc: UploadFile = File(...),
     current_vendor: Vendor = Depends(get_current_vendor),
     db: Session = Depends(get_db)
