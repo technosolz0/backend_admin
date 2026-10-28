@@ -53,8 +53,10 @@ class VendorCreate(BaseModel):
     identity_doc_number: str
     new_fcm_token: Optional[str] = None
     old_fcm_token: Optional[str] = None
+    fcm_token: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    device_name: Optional[str] = None
     referral_code: Optional[str] = None
     education: Optional[str] = None
     experience: Optional[str] = None
