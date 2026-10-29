@@ -155,6 +155,21 @@ def get_nearby_vendors(
 
         all_vendors = query.all()
 
+        pincode_clean = str(user_pincode).strip() if user_pincode else None
+        target_lat = lat
+        target_lng = lng
+
+        # If user_pincode is provided, anchor the search to that pincode's location
+        # so users booking for another location (e.g., home from office) get vendors near that address
+        if pincode_clean:
+            anchor_vendor = next(
+                (v for v in all_vendors if v.pincode and str(v.pincode).strip() == pincode_clean and v.latitude is not None and v.longitude is not None),
+                None,
+            )
+            if anchor_vendor:
+                target_lat = float(anchor_vendor.latitude)
+                target_lng = float(anchor_vendor.longitude)
+
         nearby: list = []
         for vendor in all_vendors:
             # Build charge list (optionally filtered by subcategory)
@@ -172,15 +187,15 @@ def get_nearby_vendors(
             if subcategory_id and not charges:
                 continue
 
-            # Calculate distance
+            # Calculate distance relative to target location (selected address/pincode or GPS)
             distance = haversine_distance(
-                lat, lng,
+                target_lat, target_lng,
                 float(vendor.latitude) if vendor.latitude is not None else None,
                 float(vendor.longitude) if vendor.longitude is not None else None,
             )
 
             is_nearby = distance <= radius_km
-            is_same_pincode = bool(user_pincode and vendor.pincode == user_pincode)
+            is_same_pincode = bool(pincode_clean and vendor.pincode and str(vendor.pincode).strip() == pincode_clean)
 
             if is_nearby or is_same_pincode:
                 nearby.append({
@@ -209,8 +224,14 @@ def get_nearby_vendors(
                     "charges": charges,
                 })
 
-        # Sort by distance (nearest first), None distances at end
-        nearby.sort(key=lambda v: (v["distance_km"] is None, v["distance_km"] or float('inf')))
+        # Sort exact pincode matches FIRST, then nearest distance
+        nearby.sort(
+            key=lambda v: (
+                0 if (pincode_clean and v.get("pincode") and str(v.get("pincode")).strip() == pincode_clean) else 1,
+                v["distance_km"] is None,
+                v["distance_km"] or float('inf'),
+            )
+        )
 
         logger.info(
             f"🔍 Nearby vendor query (lat={lat}, lng={lng}, r={radius_km}km) → {len(nearby)} vendors found"
