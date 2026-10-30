@@ -37,9 +37,13 @@ def update_booking_status(db: Session, booking: Booking, status: BookingStatus, 
         logger.error(f"Invalid status transition for booking {booking.id}: {booking.status} to {status}")
         raise ValueError(f"Invalid status transition from {booking.status} to {status}")
 
-    if status == BookingStatus.completed and otp and booking.otp != otp:
-        logger.error(f"Invalid OTP for booking {booking.id}")
-        raise ValueError("Invalid OTP provided")
+    if status == BookingStatus.completed:
+        if otp and booking.otp != otp:
+            logger.error(f"Invalid OTP for booking {booking.id}")
+            raise ValueError("Invalid OTP provided")
+        if booking.otp_created_at and (datetime.utcnow() - booking.otp_created_at).total_seconds() > 1800:
+            logger.error(f"Expired OTP for booking {booking.id}")
+            raise ValueError("OTP has expired (valid for 30 minutes). Please request a new OTP.")
 
     old_status = booking.status
     booking.status = status

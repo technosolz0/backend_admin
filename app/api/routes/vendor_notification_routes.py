@@ -7,7 +7,7 @@ which requires a customer user token).
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import Optional
 import json
 from datetime import datetime
@@ -24,7 +24,12 @@ def _get_vendor_notifications_query(db: Session, vendor_id: int, skip: int = 0, 
     Return notifications that target this vendor:
     - Sent to SERVICE_PROVIDERS (all vendors)
     - Or specifically targeted to this vendor_id
+    - Filters out expired notifications (e.g. OTP > 30m)
     """
+    from datetime import timedelta
+    now = datetime.utcnow()
+    otp_cutoff = now - timedelta(minutes=30)
+
     # Get all notifications sent to service providers or this specific vendor
     notifications = (
         db.query(Notification)
@@ -36,6 +41,13 @@ def _get_vendor_notifications_query(db: Session, vendor_id: int, skip: int = 0, 
             )
         )
         .filter(Notification.is_sent == True)
+        .filter(or_(Notification.expires_at.is_(None), Notification.expires_at > now))
+        .filter(
+            or_(
+                ~Notification.notification_type.in_([NotificationType.OTP_SENT, 'otp_sent', 'OTP_SENT']),
+                Notification.created_at >= otp_cutoff
+            )
+        )
         .order_by(Notification.created_at.desc())
         .offset(skip)
         .limit(limit)
@@ -77,7 +89,11 @@ def get_vendor_notifications(
         notifications = _get_vendor_notifications_query(db, current_vendor.id, skip, limit)
         result = [_build_notification_response(db, current_vendor.id, n) for n in notifications]
 
-        # Total count (for pagination)
+        from datetime import timedelta
+        now = datetime.utcnow()
+        otp_cutoff = now - timedelta(minutes=30)
+
+        # Total count (for pagination, excluding expired)
         total = (
             db.query(func.count(Notification.id))
             .filter(
@@ -88,6 +104,13 @@ def get_vendor_notifications(
                 )
             )
             .filter(Notification.is_sent == True)
+            .filter(or_(Notification.expires_at.is_(None), Notification.expires_at > now))
+            .filter(
+                or_(
+                    ~Notification.notification_type.in_([NotificationType.OTP_SENT, 'otp_sent', 'OTP_SENT']),
+                    Notification.created_at >= otp_cutoff
+                )
+            )
             .scalar()
             or 0
         )

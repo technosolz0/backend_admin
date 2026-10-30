@@ -1,4 +1,5 @@
 # app/api/routes/booking_routes.py
+from app.models import ServiceProvider
 from typing import List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -52,7 +53,9 @@ def send_booking_notification(
     recipient: str,
     recipient_id: int,
     fcm_token: Optional[str] = None,
-    custom_message: Optional[str] = None
+    custom_message: Optional[str] = None,
+    title: Optional[str] = None,
+    expires_at: Optional[datetime] = None
 ):
     """Orchestrates Firing FCM notifications for bookings."""
     if not custom_message:
@@ -62,12 +65,17 @@ def send_booking_notification(
             NotificationType.booking_cancelled: f"Your booking #{booking.id} has been cancelled.",
             NotificationType.booking_rejected: f"Your booking #{booking.id} has been rejected by the service provider.",
             NotificationType.booking_completed: f"Your booking #{booking.id} has been completed.",
-            NotificationType.otp_sent: f"An OTP for booking #{booking.id} completion has been sent to your email.",
+            NotificationType.otp_sent: f"An OTP for booking #{booking.id} completion has been generated.",
             NotificationType.payment_created: f"Payment for booking #{booking.id} has been created."
         }
         message = messages.get(notification_type, f"Booking #{booking.id} status updated to {notification_type.value}.")
     else:
         message = custom_message
+    
+    # Default 30-minute expiration for OTP notification if not explicitly passed
+    if notification_type == NotificationType.otp_sent and expires_at is None:
+        from datetime import timedelta
+        expires_at = datetime.utcnow() + timedelta(minutes=30)
     
     try:
         # 1. Store in database
@@ -75,17 +83,17 @@ def send_booking_notification(
         from ...models.notification_model import NotificationTarget, NotificationType as ModelNotificationType
         
         notification_crud = NotificationCRUD(db)
-        # Map local NotificationType to model Enum if needed, but since values match it should work
-        # target_type depends on who the recipient is. 
-        # In this app, we can determine target_type based on the recipient's role or just use SPECIFIC_USERS
         
+        notif_title = title or f"Booking Notification: {notification_type.value.replace('_', ' ').title()}"
         notification_crud.create_notification(
-            title=f"Booking Notification: {notification_type.value.replace('_', ' ').title()}",
+            title=notif_title,
             message=message,
-            notification_type=notification_type.value, # Uses string value
+            notification_type=notification_type.value,
             target_type=NotificationTarget.SPECIFIC_USERS,
             target_user_ids=[recipient_id],
-            reference_id=booking.id
+            reference_id=booking.id,
+            is_sent=True,
+            expires_at=expires_at
         )
 
         # 2. Send push/email
@@ -374,31 +382,67 @@ def update_booking_status(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{booking_id}/send-completion-otp")
+@router.post("/{booking_id}/request-otp")
 def initiate_completion_otp(
     booking_id: int,
     db: Session = Depends(get_db),
-    vendor: Vendor = Depends(get_current_vendor)
+    identity=Depends(get_current_identity)
 ):
-    """Triggers OTP for secure service completion"""
+    """
+    Triggers OTP for secure service completion.
+    Can be triggered by either the assigned vendor OR the customer user.
+    Notification is sent via Firebase push notification and visible on screen for 30 minutes.
+    """
     booking = booking_crud.get_booking_by_id(db, booking_id)
-    if not booking or booking.serviceprovider_id != vendor.id:
-        raise HTTPException(status_code=403, detail="Unauthorized provider")
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    is_vendor = isinstance(identity, ServiceProvider) and booking.serviceprovider_id == identity.id
+    is_user = isinstance(identity, User) and booking.user_id == identity.id
+
+    if not (is_vendor or is_user):
+        raise HTTPException(status_code=403, detail="Unauthorized: Only the assigned vendor or booking customer can trigger OTP")
+
     if booking.status != BookingStatus.accepted:
-        raise HTTPException(status_code=400, detail="Must be in accepted status")
+        raise HTTPException(status_code=400, detail="Booking must be in 'accepted' status to generate completion OTP")
 
     from app.utils.otp_utils import generate_otp, send_email
+    from datetime import timedelta
+    
     otp = generate_otp()
+    now = datetime.utcnow()
     booking.otp = otp
-    booking.otp_created_at = datetime.utcnow()
+    booking.otp_created_at = now
     db.commit()
 
     user = booking.user
     if user:
+        # 1. Send via email
         send_email(receiver_email=user.email, otp=otp, template="otp")
-        token = user.new_fcm_token or user.old_fcm_token
-        send_booking_notification(db, booking, NotificationType.otp_sent, user.email, user.id, token)
 
-    return {"message": "OTP sent successfully"}
+        # 2. Send via Firebase FCM push notification & store on notification screen for 30 min
+        token = user.new_fcm_token or user.old_fcm_token
+        otp_title = f"Completion OTP: {otp}"
+        otp_message = f"Your service completion OTP for Booking #{booking.id} is {otp}. Valid for 30 minutes. Share this with your provider once service is completed."
+        expires_at = now + timedelta(minutes=30)
+
+        send_booking_notification(
+            db=db,
+            booking=booking,
+            notification_type=NotificationType.otp_sent,
+            recipient=user.email,
+            recipient_id=user.id,
+            fcm_token=token,
+            custom_message=otp_message,
+            title=otp_title,
+            expires_at=expires_at
+        )
+
+    return {
+        "message": "OTP sent successfully via Firebase push notification and email",
+        "booking_id": booking.id,
+        "expires_in_minutes": 30
+    }
 
 @router.delete("/{booking_id}")
 def delete_or_cancel_booking(

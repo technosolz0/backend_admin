@@ -108,6 +108,17 @@ def alter_database_tables():
                         except Exception as e:
                             logger.warning(f"Could not add '{col_name}' to 'wallets': {e}")
 
+            # Specific checks for notifications table
+            if table_name == "notifications":
+                if "expires_at" not in column_names:
+                    logger.info("Adding 'expires_at' column to 'notifications'...")
+                    try:
+                        col_type = "TIMESTAMP WITH TIME ZONE NULL" if dialect_name in ("postgresql", "postgres") else "DATETIME NULL"
+                        connection.execute(text(f"ALTER TABLE notifications ADD COLUMN expires_at {col_type}"))
+                        logger.info("Successfully added 'expires_at' to 'notifications'.")
+                    except Exception as e:
+                        logger.warning(f"Could not add 'expires_at' to 'notifications': {e}")
+
     # Step 3: PostgreSQL-specific enum alterations
     if dialect_name in ("postgresql", "postgres"):
         try:

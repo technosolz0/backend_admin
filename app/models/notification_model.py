@@ -37,6 +37,7 @@ class Notification(Base):
     sent_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_sent = Column(Boolean, default=False)
     sent_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # For time-limited notifications (e.g. OTP 30 min)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
