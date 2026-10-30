@@ -117,6 +117,19 @@ def alter_database_tables():
                     logger.info("Ensured 'inactive' exists in vendor_status enum.")
                 except Exception as enum_err:
                     logger.warning(f"Note on vendor_status enum: {enum_err}")
+
+                notification_enum_values = [
+                    'BOOKING_CREATED', 'BOOKING_ACCEPTED', 'BOOKING_CANCELLED',
+                    'BOOKING_REJECTED', 'BOOKING_COMPLETED', 'OTP_SENT', 'PAYMENT_CREATED',
+                    'booking_created', 'booking_accepted', 'booking_cancelled',
+                    'booking_rejected', 'booking_completed', 'otp_sent', 'payment_created'
+                ]
+                for val in notification_enum_values:
+                    try:
+                        autocommit_conn.execute(text(f"ALTER TYPE notificationtype ADD VALUE IF NOT EXISTS '{val}'"))
+                        logger.info(f"Ensured '{val}' exists in notificationtype enum.")
+                    except Exception as enum_err:
+                        logger.warning(f"Note on notificationtype enum value '{val}': {enum_err}")
         except Exception as e:
             logger.warning(f"Could not connect for autocommit enum alteration: {e}")
 

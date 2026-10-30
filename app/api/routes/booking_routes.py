@@ -97,6 +97,7 @@ def send_booking_notification(
             fcm_token=fcm_token
         )
     except Exception as e:
+        db.rollback()
         logger.error(f"FCM Notification Error for {recipient}: {str(e)}")
 
 def enrich_booking_object(booking: Booking, db: Session) -> Booking:

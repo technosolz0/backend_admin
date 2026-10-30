@@ -28,10 +28,14 @@ class NotificationCRUD:
             reference_id=reference_id
         )
 
-        self.db.add(notification)
-        self.db.commit()
-        self.db.refresh(notification)
-        return notification
+        try:
+            self.db.add(notification)
+            self.db.commit()
+            self.db.refresh(notification)
+            return notification
+        except Exception:
+            self.db.rollback()
+            raise
 
     def get_notification_by_id(self, notification_id: int) -> Optional[Notification]:
         """Get notification by ID"""

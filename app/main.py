@@ -119,6 +119,21 @@ async def on_startup():
     except Exception as e:
         logger.warning(f"Auto-column check on startup skipped: {e}")
 
+    # Auto-ensure PostgreSQL enum values exist
+    if engine.dialect.name.lower() in ("postgresql", "postgres"):
+        try:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
+                for val in ('BOOKING_CREATED', 'BOOKING_ACCEPTED', 'BOOKING_CANCELLED',
+                            'BOOKING_REJECTED', 'BOOKING_COMPLETED', 'OTP_SENT', 'PAYMENT_CREATED',
+                            'booking_created', 'booking_accepted', 'booking_cancelled',
+                            'booking_rejected', 'booking_completed', 'otp_sent', 'payment_created'):
+                    try:
+                        autocommit_conn.execute(text(f"ALTER TYPE notificationtype ADD VALUE IF NOT EXISTS '{val}'"))
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"Auto-enum sync on startup skipped: {e}")
+
     await init_redis()
 
 

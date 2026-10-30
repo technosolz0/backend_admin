@@ -23,6 +23,7 @@ class NotificationType(str, Enum):
     otp_sent = "otp_sent"
     payment_created = "payment_created"
     admin_status_updated = "admin_status_updated"
+    vendor_welcome = "vendor_welcome"
 
 def send_push_notification(token: str, title: str, body: str, data: dict = None):
     """
